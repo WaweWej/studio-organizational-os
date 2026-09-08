@@ -154,6 +154,7 @@ function newTask(
     title,
     description,
     projectId,
+    spaceId: null,
     assignee: 'me',
     reviewer: 'me',
     stage: 'Up next',
@@ -189,27 +190,55 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
     await mutateClient(c, input);
     return;
   }
-  if (type === 'create') {
+  if (type === 'create' || type === 'quick-create') {
     const title = textValue(input.title, 'Task name', 180, true),
       description = textValue(input.description ?? '', 'Description'),
       projectId = textValue(input.projectId ?? '', 'Project', 100) || null;
     if (projectId) await exists(c, 'projects', projectId);
+    const directSpaceId = textValue(input.spaceId ?? '', 'Client', 100) || null;
+    if (directSpaceId) await exists(c, 'spaces', directSpaceId);
+    if (projectId && directSpaceId) {
+      const project = await c.db
+        .prepare('SELECT spaceId FROM projects WHERE org=? AND id=?')
+        .bind(c.org, projectId)
+        .first<{ spaceId: string | null }>();
+      if (project?.spaceId !== directSpaceId)
+        throw new AppError('The client and project do not match.');
+    }
+    const captureId =
+      type === 'quick-create'
+        ? textValue(input.captureId, 'Capture ID', 36, true)
+        : nonce;
+    if (
+      type === 'quick-create' &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        captureId,
+      )
+    )
+      throw new AppError('Invalid capture ID.');
+    const captureText =
+      type === 'quick-create'
+        ? textValue(input.captureText ?? '', 'Capture text', 2000, true)
+        : '';
     const count = await c.db
       .prepare(
-        'SELECT COALESCE(MAX(position),0)+1 AS position FROM tasks WHERE org=?',
+        type === 'quick-create'
+          ? 'SELECT COALESCE(MIN(position),0)-1 AS position FROM tasks WHERE org=?'
+          : 'SELECT COALESCE(MAX(position),0)+1 AS position FROM tasks WHERE org=?',
       )
       .bind(c.org)
       .first<{ position: number }>();
     const t = newTask(
-      nonce,
+      captureId,
       title,
       description,
       projectId,
-      count?.position || 1,
+      count?.position ?? 1,
     );
+    t.spaceId = projectId ? null : directSpaceId;
     t.due = dateValue(input.due ?? '');
     t.assignee = textValue(
-      input.assignee ?? c.actor,
+      type === 'quick-create' ? c.actor : (input.assignee ?? c.actor),
       'Responsible person',
       100,
       true,
@@ -234,16 +263,54 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
         );
       t.meetingId = meetingId;
     }
-    await c.db.batch([
-      insert(c.db, 'tasks', c.org, t),
-      insert(c.db, 'activities', c.org, {
-        id: crypto.randomUUID(),
-        taskId: t.id,
-        body: 'Created the task',
-        actor: c.actor,
-        createdAt: now,
-      }),
+    const sameCapture = (existing: Task) =>
+      existing.title === t.title &&
+      existing.description === t.description &&
+      existing.projectId === t.projectId &&
+      existing.spaceId === t.spaceId &&
+      existing.due === t.due &&
+      existing.assignee === t.assignee;
+    if (type === 'quick-create') {
+      const existing = await c.db
+        .prepare('SELECT * FROM tasks WHERE org=? AND id=?')
+        .bind(c.org, t.id)
+        .first<Task>();
+      if (existing) {
+        if (!sameCapture(existing))
+          throw new AppError(
+            'This capture was already saved with different details.',
+            409,
+          );
+        return;
+      }
+    }
+    const result = await c.db.batch([
+      insert(c.db, 'tasks', c.org, { ...t, lastMutation: nonce }),
+      insert(
+        c.db,
+        'activities',
+        c.org,
+        {
+          id: crypto.randomUUID(),
+          taskId: t.id,
+          body: captureText ? 'Captured: ' + captureText : 'Created the task',
+          actor: c.actor,
+          createdAt: now,
+        },
+        { id: t.id, nonce },
+      ),
     ]);
+    if (!result[0].meta.changes && type === 'quick-create') {
+      const existing = await c.db
+        .prepare('SELECT * FROM tasks WHERE org=? AND id=?')
+        .bind(c.org, t.id)
+        .first<Task>();
+      if (!existing || !sameCapture(existing))
+        throw new AppError(
+          'This capture was already saved with different details.',
+          409,
+        );
+    }
     return;
   }
   if (type === 'template') {

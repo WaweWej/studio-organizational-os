@@ -29,6 +29,13 @@
       "when": 1788871057270,
       "tag": "0003_dashing_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788889579505,
+      "tag": "0004_woozy_paper_doll",
+      "breakpoints": true
     }
   ]
 }

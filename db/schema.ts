@@ -68,6 +68,7 @@ export const tasks = sqliteTable(
     ...identity(),
     title: text('title').notNull(),
     projectId: text('projectId'),
+    spaceId: text('spaceId'),
     assignee: text('assignee').notNull(),
     reviewer: text('reviewer').notNull(),
     stage: text('stage').notNull(),

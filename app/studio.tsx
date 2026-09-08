@@ -1,5 +1,8 @@
 'use client';
+import { taskSpaceId } from '@/lib/task-context';
 import ClientFocus from './client-focus';
+import WorkBoard from './work-board';
+import QuickCapture, { type CaptureDraft } from './quick-capture';
 import ClientDirectory from './client-directory';
 import SharedCalendar from './shared-calendar';
 import ResourceLibrary, {
@@ -12,6 +15,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type CSSProperties,
   type FormEvent,
 } from 'react';
@@ -154,8 +158,13 @@ function Picker({
     </Select>
   );
 }
-const stageIcon = [Circle, CircleDot, Clock3, CircleCheck];
+
 export default function Studio() {
+  const captureDrafts = useRef(new Map<string, CaptureDraft>());
+  const [captureRequested, setCaptureRequested] = useState(0);
+  const [taskFocus, setTaskFocus] = useState<'brief' | 'work' | undefined>(
+    undefined,
+  );
   const [data, setData] = useState<Workspace>(initialWorkspace),
     [ready, setReady] = useState(false),
     [page, setPage] = useState('day'),
@@ -210,7 +219,8 @@ export default function Studio() {
     }
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const openTask = (id: string) => {
+  const openTask = (id: string, focus?: 'brief' | 'work') => {
+    setTaskFocus(focus);
     setSelected(id);
     const url = new URL(window.location.href);
     url.searchParams.set('task', id);
@@ -299,96 +309,23 @@ export default function Studio() {
         page !== 'day' || scope === 'team' || t.assignee === data.currentMember,
     )
     .filter((t) => !projectId || t.projectId === projectId)
-    .filter(
-      (t) =>
-        !spaceId ||
-        data.projects.find((p) => p.id === t.projectId)?.spaceId === spaceId,
-    )
+    .filter((t) => !spaceId || taskSpaceId(data, t) === spaceId)
     .sort((a, b) => a.position - b.position);
-  const card = (task: Task) => {
-    const p = data.projects.find((p) => p.id === task.projectId),
-      s = data.spaces.find((s) => s.id === p?.spaceId),
-      m = data.members.find((m) => m.id === task.assignee);
-    return (
-      <button
-        className="task-card"
-        key={task.id}
-        onClick={() => openTask(task.id)}
-        draggable={ready && !busy}
-        onDragStart={(e) => e.dataTransfer.setData('text/plain', task.id)}
-      >
-        <span className="card-context">
-          <span
-            className="brand-dot"
-            style={{ background: s?.color || '#919aaa' }}
-          />
-          {s?.name || 'Studio'}
-        </span>
-        <strong>{task.title}</strong>
-        <span className="card-project">{p?.name || 'Inbox'}</span>
-        <span className="card-bottom">
-          <Avatar member={m} small />
-          <span>{m?.name}</span>
-          <span className="card-note">
-            <MessageSquare size={13} />
-            {data.notes.filter((n) => n.taskId === task.id).length || ''}
-          </span>
-        </span>
-      </button>
-    );
-  };
   const board = (
-    <div className="board">
-      {stages.map((stage, i) => {
-        const Icon = stageIcon[i];
-        return (
-          <section
-            key={stage}
-            className="lane"
-            onDragOver={(e) => {
-              if (ready) e.preventDefault();
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              const t = data.tasks.find(
-                (t) => t.id === e.dataTransfer.getData('text/plain'),
-              );
-              if (t)
-                void act({
-                  type: 'move',
-                  id: t.id,
-                  revision: t.revision,
-                  stage,
-                });
-            }}
-          >
-            <h2>
-              <Icon size={15} className={`stage-${i}`} />
-              {stage}
-              <span>{shown.filter((t) => t.stage === stage).length}</span>
-            </h2>
-            {shown.filter((t) => t.stage === stage).map(card)}
-            {stage === 'Up next' && (
-              <button
-                className="lane-add"
-                onClick={() => setCreate(true)}
-                disabled={!ready}
-              >
-                <Plus size={15} />
-                Add task
-              </button>
-            )}
-            {!shown.some((t) => t.stage === stage) && (
-              <div className="lane-empty">
-                {stage === 'Done'
-                  ? 'Finished work will appear here.'
-                  : 'Nothing here yet.'}
-              </div>
-            )}
-          </section>
-        );
-      })}
-    </div>
+    <WorkBoard
+      key={projectId || 'workspace'}
+      data={data}
+      tasks={shown}
+      ready={ready}
+      busy={busy}
+      error={error}
+      act={act}
+      openTask={openTask}
+      projectId={projectId}
+      captureRequested={captureRequested}
+      enabled={!selected && !search && !notices && !create && !documentId}
+      drafts={captureDrafts.current}
+    />
   );
   return (
     <ResourceProvider
@@ -548,7 +485,11 @@ export default function Studio() {
                 {['day', 'work'].includes(page) && (
                   <Button
                     className="primary-button"
-                    onClick={() => setCreate(true)}
+                    onClick={() => {
+                      if (page === 'day' || projectId)
+                        setCaptureRequested((v) => v + 1);
+                      else setCreate(true);
+                    }}
                     disabled={!ready}
                   >
                     <Plus size={16} />
@@ -826,7 +767,8 @@ export default function Studio() {
             )}
             {currentTask && (
               <TaskDetail
-                key={currentTask.id}
+                key={currentTask.id + ':' + (taskFocus || 'default')}
+                initialTab={taskFocus}
                 task={currentTask}
                 data={data}
                 busy={busy}
@@ -850,12 +792,18 @@ export default function Studio() {
                 {error}
               </div>
             )}
-            <CreateTask
+            <QuickCapture
               data={data}
-              projectId={projectId}
+              ready={ready}
               busy={busy}
-              save={async (fields) => {
-                if (await act({ type: 'create', ...fields })) setCreate(false);
+              error={error}
+              act={act}
+              projectId={projectId}
+              close={() => setCreate(false)}
+              drafts={captureDrafts.current}
+              onCreated={(id) => {
+                setCreate(false);
+                openTask(id);
               }}
             />
           </DialogContent>
@@ -982,68 +930,8 @@ export default function Studio() {
     </ResourceProvider>
   );
 }
-function CreateTask({
-  data,
-  projectId,
-  busy,
-  save,
-}: {
-  data: Workspace;
-  projectId: string | null;
-  busy: boolean;
-  save: (v: Record<string, string>) => void;
-}) {
-  const [project, setProject] = useState(projectId || 'inbox');
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        const f = new FormData(e.currentTarget);
-        save({
-          title: String(f.get('title')),
-          description: String(f.get('description')),
-          projectId: project === 'inbox' ? '' : project,
-        });
-      }}
-      className="edit-form"
-    >
-      <label>
-        What needs to happen?
-        <Input
-          name="title"
-          required
-          maxLength={180}
-          placeholder="Give the task a clear outcome"
-          autoFocus
-        />
-      </label>
-      <label>
-        Project
-        <Picker
-          label="Project"
-          value={project}
-          onChange={setProject}
-          items={[
-            { value: 'inbox', label: 'Inbox — organize later' },
-            ...data.projects.map((p) => ({ value: p.id, label: p.name })),
-          ]}
-        />
-      </label>
-      <label>
-        Context
-        <Textarea
-          name="description"
-          placeholder="The brief, a note, or a useful starting point…"
-          rows={4}
-        />
-      </label>
-      <Button type="submit" disabled={busy}>
-        {busy ? 'Saving…' : 'Create task'}
-      </Button>
-    </form>
-  );
-}
 function TaskDetail({
+  initialTab,
   task,
   data,
   busy,
@@ -1051,6 +939,7 @@ function TaskDetail({
   openProject,
   openSpace,
 }: {
+  initialTab?: 'brief' | 'work';
   task: Task;
   data: Workspace;
   busy: boolean;
@@ -1058,13 +947,15 @@ function TaskDetail({
   openProject: (id: string) => void;
   openSpace: (id: string) => void;
 }) {
-  const [tab, setTab] = useState(task.stage === 'Review' ? 'work' : 'brief'),
+  const [tab, setTab] = useState<string>(
+      initialTab || (task.stage === 'Review' ? 'work' : 'brief'),
+    ),
     [assignee, setAssignee] = useState(task.assignee),
     [reviewer, setReviewer] = useState(task.reviewer),
     [feedback, setFeedback] = useState(''),
     [note, setNote] = useState('');
   const project = data.projects.find((p) => p.id === task.projectId),
-    space = data.spaces.find((s) => s.id === project?.spaceId),
+    space = data.spaces.find((s) => s.id === taskSpaceId(data, task)),
     member = data.members.find((m) => m.id === task.assignee),
     reviews = data.reviews.filter((r) => r.taskId === task.id),
     currentReview = reviews.find(
@@ -1125,6 +1016,18 @@ function TaskDetail({
       </Tabs>
       {tab === 'brief' && (
         <>
+          {space && (
+            <section className="task-client-context">
+              <header>
+                <strong>{space.name}</strong>
+                <button onClick={() => openSpace(space.id)}>
+                  Brief, meetings & notes
+                  <ArrowUpRight size={13} />
+                </button>
+              </header>
+              <p>{space.brief}</p>
+            </section>
+          )}
           <form className="edit-form" onSubmit={save}>
             <label>
               Task name

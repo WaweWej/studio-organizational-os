@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable next/no-img-element -- Client images use direct HTTPS addresses; no image proxy is configured. */
 
+import { taskSpaceId } from '@/lib/task-context';
 import {
   useState,
   useEffect,
@@ -262,9 +263,7 @@ export default function ClientFocus({
   const [deadline, setDeadline] = useState<Deadline | null>(null);
   const [workFilter, setWorkFilter] = useState('Open');
   const projects = data.projects.filter((p) => p.spaceId === space.id);
-  const tasks = data.tasks.filter((t) =>
-    projects.some((p) => p.id === t.projectId),
-  );
+  const tasks = data.tasks.filter((t) => taskSpaceId(data, t) === space.id);
   const open = tasks.filter((t) => t.stage !== 'Done');
   const overdue = open.filter((t) => t.due && t.due < todayKey(now));
   const inReview = open.filter((t) => t.stage === 'Review');
@@ -308,7 +307,10 @@ export default function ClientFocus({
         )}
         <span>
           <strong>{task.title}</strong>
-          <small>{projects.find((p) => p.id === task.projectId)?.name}</small>
+          <small>
+            {projects.find((p) => p.id === task.projectId)?.name ||
+              'Client task'}
+          </small>
         </span>
       </button>
       <Stage task={task} />

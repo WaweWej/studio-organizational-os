@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable next/no-img-element -- Brand covers are served directly; no image proxy is configured. */
 
+import { taskSpaceId } from '@/lib/task-context';
 import { useState, type CSSProperties } from 'react';
 import { ArrowUpRight, ArrowRight } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -61,8 +62,7 @@ export default function ClientDirectory({
         {spaces.map((space, index) => {
           const projects = data.projects.filter((p) => p.spaceId === space.id);
           const tasks = data.tasks.filter(
-            (t) =>
-              t.stage !== 'Done' && projects.some((p) => p.id === t.projectId),
+            (t) => t.stage !== 'Done' && taskSpaceId(data, t) === space.id,
           );
           const next = data.meetings
             .filter((m) => m.spaceId === space.id && m.status === 'Planned')

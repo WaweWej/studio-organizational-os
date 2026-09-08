@@ -55,6 +55,7 @@ export type Project = {
   due: string;
 };
 export type Task = {
+  spaceId: string | null;
   id: string;
   title: string;
   projectId: string | null;
@@ -248,6 +249,7 @@ export function initialWorkspace(): Workspace {
       id,
       title,
       projectId,
+      spaceId: null,
       assignee,
       reviewer: 'me',
       stage: stage as Stage,

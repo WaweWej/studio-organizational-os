@@ -1,3 +1,4 @@
+import { taskSpaceId } from './task-context';
 import type { Workspace } from './model';
 
 export type DeadlineEntry = {
@@ -77,7 +78,8 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
   });
   for (const task of data.tasks) {
     const project = task.projectId ? projects.get(task.projectId) : undefined;
-    const space = project?.spaceId ? spaces.get(project.spaceId) : undefined;
+    const spaceId = taskSpaceId(data, task);
+    const space = spaceId ? spaces.get(spaceId) : undefined;
     entries.push({
       key: 'task:' + task.id,
       kind: 'task',
@@ -85,7 +87,7 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
       title: task.title,
       due: task.due,
       projectId: task.projectId,
-      spaceId: project?.spaceId || null,
+      spaceId,
       client: space?.name || (project ? 'Internal' : 'Inbox'),
       color: space?.color || '#64718a',
       ownerId: task.assignee,

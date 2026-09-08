@@ -4,6 +4,7 @@ import './studio.css';
 import './client-focus.css';
 import './editorial.css';
 import './shared-calendar.css';
+import './work-board.css';
 
 export const metadata: Metadata = {
   title: 'Studio — Your organizational workspace',

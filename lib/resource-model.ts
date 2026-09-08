@@ -1,3 +1,4 @@
+import { taskSpaceId } from './task-context';
 import type { Workspace } from './model';
 export type ResourceKind = 'asset' | 'template' | 'tool' | 'vault';
 export type Resource = {
@@ -74,9 +75,16 @@ export function relatedResources(
   if (target.type === 'task') {
     const t = data.tasks.find((t) => t.id === target.id);
     if (t?.projectId) addProject(t.projectId);
+    if (t) {
+      const spaceId = taskSpaceId(data, t);
+      if (spaceId) targets.add('space:' + spaceId);
+    }
   }
   if (target.type === 'project') addProject(target.id, true);
   if (target.type === 'space') {
+    data.tasks
+      .filter((t) => taskSpaceId(data, t) === target.id)
+      .forEach((t) => targets.add('task:' + t.id));
     data.projects
       .filter((p) => p.spaceId === target.id)
       .forEach((p) => addProject(p.id, true));
