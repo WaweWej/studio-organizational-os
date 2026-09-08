@@ -67,12 +67,12 @@ export async function mutateClient(c: Context, input: Record<string, unknown>) {
   const nonce = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  if (type === 'client-project-deadline') {
+  if (type === 'client-project-deadline' || type === 'project-deadline') {
     const project = await c.db
       .prepare('SELECT spaceId,due FROM projects WHERE org=? AND id=?')
       .bind(c.org, id)
-      .first<{ spaceId: string; due: string }>();
-    if (!project?.spaceId) throw new AppError('Client project not found.', 404);
+      .first<{ spaceId: string | null; due: string }>();
+    if (!project || (type === 'client-project-deadline' && !project.spaceId)) throw new AppError('Project not found.', 404);
     const due = dateValue(input.due),
       previous = dateValue(input.previous);
     const result = await c.db

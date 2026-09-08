@@ -1,0 +1,54 @@
+import { AppError } from './validation';
+export function json(body: unknown, status = 200) {
+  return Response.json(body, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
+export function apiFailure(error: unknown) {
+  return json(
+    {
+      error:
+        error instanceof AppError
+          ? error.message
+          : 'The operation could not be completed. Please try again.',
+    },
+    error instanceof AppError ? error.status : 500,
+  );
+}
+export function sameOrigin(request: Request) {
+  const origin = request.headers.get('origin');
+  if (
+    (origin && origin !== new URL(request.url).origin) ||
+    request.headers.get('sec-fetch-site') === 'cross-site'
+  )
+    throw new AppError('This request came from another origin.', 403);
+}
+export async function boundedBody(request: Request, max: number) {
+  if (Number(request.headers.get('content-length') || 0) > max)
+    throw new AppError('File or request is too large.', 413);
+  const reader = request.body?.getReader();
+  if (!reader) throw new AppError('A request body is required.');
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.length;
+    if (length > max) {
+      await reader.cancel();
+      throw new AppError('File or request is too large.', 413);
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes;
+}

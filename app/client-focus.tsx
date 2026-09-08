@@ -32,6 +32,7 @@ import {
   Target,
   X,
 } from 'lucide-react';
+import { RelatedResources } from './resource-library';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -449,6 +450,7 @@ export default function ClientFocus({
             </TabsTrigger>
             <TabsTrigger value="meetings">Meetings</TabsTrigger>
             <TabsTrigger value="brand">Brand & context</TabsTrigger>
+            <TabsTrigger value="resources">Library & tools</TabsTrigger>
           </TabsList>
         </Tabs>
         <Button
@@ -899,43 +901,13 @@ export default function ClientFocus({
               )}
             </section>
           </div>
-          <section className="cf-panel cf-linked-tools">
-            <PanelHeading title="Tools with a place in this client’s work" />
-            {data.tools
-              .filter((t) => projects.some((p) => p.id === t.projectId))
-              .map((t) => (
-                <div className="cf-tool-row" key={t.id}>
-                  <span className="cf-tool-symbol">
-                    <Sparkles size={17} />
-                  </span>
-                  <div>
-                    <strong>{t.name}</strong>
-                    <p>{t.description}</p>
-                  </div>
-                  {t.url ? (
-                    <a href={t.url} target="_blank" rel="noreferrer">
-                      Open
-                      <ArrowUpRight size={15} />
-                    </a>
-                  ) : (
-                    <span className="cf-muted">Link not configured</span>
-                  )}
-                </div>
-              ))}
-            {!data.tools.some((t) =>
-              projects.some((p) => p.id === t.projectId),
-            ) && (
-              <p className="cf-muted">
-                No tools linked to this client’s projects yet.
-              </p>
-            )}
-            <p className="cf-connection-note">
-              Google Drive, Calendar and Slack are not connected yet.
-            </p>
-          </section>
+          <RelatedResources target={{ type: 'space', id: space.id }} />
         </div>
       )}
 
+      {tab === 'resources' && (
+        <RelatedResources target={{ type: 'space', id: space.id }} />
+      )}
       <Dialog open={editBrand} onOpenChange={setEditBrand}>
         <DialogContent className="cf-dialog cf-brand-dialog">
           <DialogHeader>
