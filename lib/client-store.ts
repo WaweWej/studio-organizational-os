@@ -4,7 +4,16 @@ import { AppError, dateValue, revisionValue, textValue } from './validation';
 
 function webUrl(value: unknown, label: string, image = false) {
   const raw = textValue(value ?? '', label, 2000);
-  if (!raw || (image && raw === '/images/nord-form-cover.png')) return raw;
+  if (
+    !raw ||
+    (image &&
+      [
+        '/images/nord-form-cover.png',
+        '/images/harbor-coffee-editorial.png',
+        '/images/juniper-hotels-editorial.png',
+      ].includes(raw))
+  )
+    return raw;
   try {
     const url = new URL(raw);
     if (url.protocol !== 'https:' || url.username || url.password)

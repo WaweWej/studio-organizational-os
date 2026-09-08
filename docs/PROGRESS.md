@@ -26,3 +26,9 @@ This remains a private pilot with sample colleagues and clients, and one authent
 Client identity currently supports name, brand line, hosted logo/cover addresses, signature color and three typography choices. Arbitrary layouts, custom sections and uploaded fonts remain later work.
 
 The current client experience is ready for private preview publication. Deployment status must be checked separately; a successful local build alone is not proof that a Site is live.
+
+## Editorial design refinement
+
+The client directory now uses a magazine index with a featured brand spread, photographic covers for Nord & Form, Harbor Coffee and Juniper Hotels, and distinct typographic treatments for the remaining spaces. The client interior has a larger editorial masthead, numbered working sections, ruled task lists, a client-goal pull quote, and a meeting-decision footer. The editing and task workflows are retained. Covers for Harbor Coffee and Juniper Hotels are original illustrative sample images. The sample migration updates only previously untouched sample spaces.
+
+Private publishing is currently blocked: automatic approval review rejected the upload of the app source to the Sites repository because explicit authorization and destination trust were not established to its satisfaction. No source was pushed and no version was deployed. The local preview remains available.

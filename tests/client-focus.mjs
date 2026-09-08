@@ -35,6 +35,7 @@ try {
     ...original,
     type: 'client-edit',
     wants: 'A clear launch plan with accountable next steps.',
+    coverUrl: '/images/harbor-coffee-editorial.png',
   });
   changedProfile = true;
   let current = data.spaces.find((s) => s.id === original.id);

@@ -15,6 +15,13 @@
       "when": 1788858973370,
       "tag": "0001_ambiguous_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788860970886,
+      "tag": "0002_editorial_brand_samples",
+      "breakpoints": true
     }
   ]
 }
