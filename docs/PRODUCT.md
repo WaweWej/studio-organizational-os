@@ -1,0 +1,11 @@
+# Studio
+
+The complete accepted direction is in `../MASTER_PROMPT.md` in the parent workspace. It captures the user's discovery answers plus explicitly labeled assumptions. Studio is an organizational OS for a small agency initially, with adaptable modules for other organizations later.
+
+The daily board is the entry point. Canvas belongs in Blueprint workflows. A task has one record across personal work, team work, project, and client context. Client access is limited to specific shared views. Work includes context, versioned review, and an attributed history. Monday remains until its needed automation behavior can be migrated safely.
+
+Current implementation target: a persistent daily-work-to-review loop. Deliverable approval and external delivery are separate actions. Sample data must be labeled. No external service is treated as connected without verification.
+
+Initial demo organization: six sample people, ten spaces, five projects, twelve tasks, several review states, one blocked task, tool records, and a small knowledge collection. Sample people are not authenticated invited team members.
+
+Deferred: commercial billing, unrestricted plugins, full ERP, complex external client accounts, production automation cutover. These are not being silently removed from the longer-term product direction.

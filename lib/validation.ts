@@ -1,0 +1,7 @@
+import { stages, type Task, type Stage } from './model';
+export class AppError extends Error { status:number; constructor(message:string,status=400){super(message);this.status=status} }
+export function textValue(value:unknown,name:string,max=10000,required=false):string {if(typeof value!=='string')throw new AppError(`${name} must be text.`);const result=value.trim();if(required&&!result)throw new AppError(`${name} is required.`);if(result.length>max)throw new AppError(`${name} is too long.`);return result}
+export function revisionValue(value:unknown):number {if(typeof value!=='number'||!Number.isSafeInteger(value)||value<0)throw new AppError('A valid record revision is required.');return value}
+export function stageValue(value:unknown):Stage {if(!stages.includes(value as Stage))throw new AppError('Choose a valid task stage.');return value as Stage}
+export function canSubmit(task:Task){if(!task.deliverable.trim())throw new AppError('Save a deliverable in Work & review before requesting review.');if(!task.reviewer)throw new AppError('Choose a reviewer first.');if(task.stage==='Review')throw new AppError('This task is already in review.');if(task.stage==='Done')throw new AppError('Reopen this task before submitting a new version.')}
+export function dateValue(value:unknown){const date=textValue(value,'Due date',10);if(date&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||(Number.isNaN(Date.parse(date+'T12:00:00Z'))||new Date(date+'T12:00:00Z').toISOString().slice(0,10)!==date)))throw new AppError('Choose a valid due date.');return date}
