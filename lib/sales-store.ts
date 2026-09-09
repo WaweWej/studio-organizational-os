@@ -1,3 +1,4 @@
+import { captureInsert } from './entry-store';
 import type { Context } from './store';
 import { AppError, textValue, revisionValue, dateValue } from './validation';
 import { parseSalesCapture, salesStages, type Prospect } from './sales-model';
@@ -100,6 +101,26 @@ export async function mutateSales(c: Context, input: Record<string, unknown>) {
           id,
           nonce,
         ),
+      captureInsert(
+        c,
+        {
+          id,
+          kind: 'sales',
+          sourceText: text,
+          title: draft.nextStep,
+          body: '',
+          targetType: 'task',
+          targetId: id,
+          spaceId: null,
+          projectId: null,
+          taskId: id,
+          actor: c.actor,
+          createdAt: now,
+        },
+        nonce,
+        '',
+        { taskId: id },
+      ),
     ]);
     if (!results[1].meta.changes) {
       const saved = await c.db

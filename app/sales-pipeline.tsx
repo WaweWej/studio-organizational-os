@@ -60,7 +60,7 @@ export default function SalesPipeline({
     <section className="sales-pipeline">
       <header className="desk-heading">
         <div>
-          <p className="os-overline">Spaces / Prospects</p>
+          <p className="os-overline">Sales / Prospects</p>
           <h1>Every conversation leads somewhere.</h1>
           <p>The relationship, the history, and a clear next step.</p>
         </div>

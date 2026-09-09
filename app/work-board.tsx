@@ -11,8 +11,6 @@ import {
   CircleCheck,
   MessageSquare,
   Link2,
-  ArrowUpRight,
-  Check,
   GripVertical,
   Flag,
 } from 'lucide-react';
@@ -27,6 +25,7 @@ import {
 import { stages, type Workspace, type Task, type Stage } from '@/lib/model';
 import { taskSpaceId } from '@/lib/task-context';
 import { relatedResources } from '@/lib/resource-model';
+import type { CaptureEntry } from '@/lib/entry-model';
 import QuickCapture, { type CaptureDraft } from './quick-capture';
 const stageIcons = [Circle, CircleDot, Clock3, CircleCheck];
 export default function WorkBoard({
@@ -39,6 +38,7 @@ export default function WorkBoard({
   openTask,
   projectId,
   captureRequested = 0,
+  onOpenEntry,
   enabled,
   drafts,
 }: {
@@ -51,6 +51,7 @@ export default function WorkBoard({
   openTask: (id: string, focus?: 'brief' | 'work') => void;
   projectId: string | null;
   captureRequested?: number;
+  onOpenEntry?: (entry: CaptureEntry) => void;
   enabled: boolean;
   drafts: Map<string, CaptureDraft>;
 }) {
@@ -125,9 +126,10 @@ export default function WorkBoard({
               <Plus size={19} />
             </span>
             <span>
-              What needs to happen?
+              Capture what’s on your mind.
               <small>
-                Write a task. Connect the context with <AtSign size={12} />.
+                Notes, meetings, tasks. Connect the context with{' '}
+                <AtSign size={12} />.
               </small>
             </span>
             <kbd>
@@ -148,24 +150,15 @@ export default function WorkBoard({
             enabled={capturing && enabled}
             close={() => setCapturing(false)}
             drafts={drafts}
-            onCreated={(id, title) => setRecent({ id, title })}
+            onOpenEntry={onOpenEntry}
+            onCreated={(id, title, kind) =>
+              setRecent(
+                kind === 'task' || kind === 'sales' ? { id, title } : null,
+              )
+            }
           />
         </div>
       </div>
-      {recent && (
-        <output className="board-created">
-          <Check size={14} />
-          <span>
-            Added to{' '}
-            {tasks.some((t) => t.id === recent.id) ? 'Up next' : 'My day'}
-            <span className="board-created-title"> · {recent.title}</span>
-          </span>
-          <button onClick={() => openTask(recent.id)}>
-            Open task
-            <ArrowUpRight size={13} />
-          </button>
-        </output>
-      )}
       <div className="workboard-lanes">
         {stages.map((stage, i) => {
           const Icon = stageIcons[i],

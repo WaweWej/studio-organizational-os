@@ -1,5 +1,7 @@
 'use client';
 import { taskSpaceId } from '@/lib/task-context';
+import WorkingDesk, { ConnectedNotes, CapturedNote } from './working-desk';
+import type { CaptureEntry } from '@/lib/entry-model';
 import ClientFocus from './client-focus';
 import SalesPipeline from './sales-pipeline';
 import Today, { readableDate } from './today';
@@ -33,6 +35,7 @@ import {
   BookOpen,
   Layers,
   BriefcaseBusiness,
+  Handshake,
   Workflow,
   Search,
   Bell,
@@ -92,6 +95,7 @@ import {
 const navigation = [
   { id: 'day', name: 'Today', icon: Sun },
   { id: 'spaces', name: 'Spaces', icon: BriefcaseBusiness },
+  { id: 'sales', name: 'Sales', icon: Handshake },
   { id: 'work', name: 'Work', icon: Layers },
   { id: 'library', name: 'Library', icon: BookOpen },
   { id: 'blueprints', name: 'Systems', icon: Workflow },
@@ -106,7 +110,6 @@ const pages = [
 ];
 const parentPage = (page: string) =>
   ({
-    sales: 'spaces',
     calendar: 'work',
     tools: 'library',
     insights: 'blueprints',
@@ -159,6 +162,7 @@ function Picker({
 
 export default function Studio() {
   const captureDrafts = useRef(new Map<string, CaptureDraft>());
+  const [capturedNoteId, setCapturedNoteId] = useState<string | null>(null);
   const [prospectId, setProspectId] = useState<string | null>(null);
   const [dayView, setDayView] = useState('brief');
   const [intentQuery, setIntentQuery] = useState('');
@@ -221,6 +225,10 @@ export default function Studio() {
       setPage('sales');
       setProspectId(params.get('prospect'));
     }
+    if (params.get('desk') === '1') {
+      setPage('day');
+      setDayView('desk');
+    }
     if (params.get('task')) setSelected(params.get('task'));
     if (params.get('project')) {
       setPage('work');
@@ -234,8 +242,10 @@ export default function Studio() {
   }, []);
   useEffect(() => {
     if (
-      !((page === 'day' && dayView === 'brief') || page === 'sales') ||
+      (page === 'day' && dayView !== 'brief') ||
+      (page === 'work' && !!projectId) ||
       prospectId ||
+      capturedNoteId ||
       !ready ||
       search ||
       create ||
@@ -275,6 +285,8 @@ export default function Studio() {
     page,
     dayView,
     prospectId,
+    capturedNoteId,
+    projectId,
     ready,
     search,
     create,
@@ -289,10 +301,11 @@ export default function Studio() {
   };
   const capture = (text?: string) => {
     if (text)
-      captureDrafts.current.set(projectId || 'workspace', {
+      captureDrafts.current.set('overlay', {
         text,
         pins: [],
         contextProject: projectId,
+        contextSpace: spaceId,
       });
     setCaptureKey((v) => v + 1);
     setCreate(true);
@@ -337,6 +350,7 @@ export default function Studio() {
   };
   const updateSpaceUrl = (id: string | null) => {
     const url = new URL(window.location.href);
+    url.searchParams.delete('desk');
     if (id) url.searchParams.set('space', id);
     else url.searchParams.delete('space');
     window.history.replaceState(null, '', url);
@@ -347,6 +361,7 @@ export default function Studio() {
     url.searchParams.set('view', id);
     url.searchParams.delete('project');
     url.searchParams.delete('prospect');
+    url.searchParams.delete('desk');
     window.history.replaceState(null, '', url);
     setPage(id);
     setProspectId(null);
@@ -403,6 +418,27 @@ export default function Studio() {
     setDayView('board');
     setScope(mode);
   };
+  const changeDayView = (view: string) => {
+    setDayView(view);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('desk');
+    window.history.replaceState(null, '', url);
+  };
+  const openDesk = () => {
+    navigate('day');
+    setDayView('desk');
+    const url = new URL(window.location.href);
+    url.searchParams.set('desk', '1');
+    window.history.replaceState(null, '', url);
+  };
+  const openEntry = (entry: CaptureEntry) => {
+    setCreate(false);
+    if (entry.targetType === 'note') setCapturedNoteId(entry.id);
+    else if (entry.targetType === 'meeting' && entry.spaceId)
+      openMeeting(entry.spaceId, entry.targetId);
+    else if (entry.targetType === 'project') project(entry.targetId);
+    else openTask(entry.targetId);
+  };
   const currentTask = data.tasks.find((t) => t.id === selected),
     currentSpace = data.spaces.find((s) => s.id === spaceId),
     currentProject = data.projects.find((p) => p.id === projectId),
@@ -435,6 +471,7 @@ export default function Studio() {
         !documentId &&
         !briefSpaceId
       }
+      onOpenEntry={openEntry}
       drafts={captureDrafts.current}
     />
   );
@@ -526,27 +563,17 @@ export default function Studio() {
           </header>
           <main className="workspace-content">
             <nav className="context-nav" aria-label="Workspace views">
-              {['spaces', 'sales'].includes(page) && !currentSpace && (
-                <>
-                  <button
-                    className={page === 'spaces' ? 'active' : ''}
-                    onClick={() => navigate('spaces')}
-                  >
-                    Client spaces
-                  </button>
-                  <button
-                    className={page === 'sales' ? 'active' : ''}
-                    onClick={() => navigate('sales')}
-                  >
-                    Sales pipeline
-                  </button>
-                </>
-              )}
               {page === 'day' && (
                 <>
                   <button
+                    className={dayView === 'desk' ? 'active' : ''}
+                    onClick={openDesk}
+                  >
+                    Desk
+                  </button>
+                  <button
                     className={dayView === 'brief' ? 'active' : ''}
-                    onClick={() => setDayView('brief')}
+                    onClick={() => changeDayView('brief')}
                   >
                     Brief
                   </button>
@@ -555,7 +582,7 @@ export default function Studio() {
                       dayView === 'board' && scope === 'mine' ? 'active' : ''
                     }
                     onClick={() => {
-                      setDayView('board');
+                      changeDayView('board');
                       setScope('mine');
                     }}
                   >
@@ -674,7 +701,7 @@ export default function Studio() {
                     disabled={!ready}
                   >
                     <Plus size={16} />
-                    New task
+                    Capture
                   </Button>
                 )}
               </div>
@@ -707,7 +734,25 @@ export default function Studio() {
               </div>
             )}
             {page === 'day' &&
-              (dayView === 'brief' ? (
+              (dayView === 'desk' ? (
+                <WorkingDesk
+                  data={data}
+                  ready={ready}
+                  busy={busy}
+                  error={error}
+                  act={act}
+                  drafts={captureDrafts.current}
+                  openEntry={openEntry}
+                  enabled={
+                    !selected &&
+                    !create &&
+                    !search &&
+                    !notices &&
+                    !briefSpaceId &&
+                    !capturedNoteId
+                  }
+                />
+              ) : dayView === 'brief' ? (
                 <Today
                   data={data}
                   ready={ready}
@@ -715,6 +760,7 @@ export default function Studio() {
                   openBrief={setBriefSpaceId}
                   openSpace={space}
                   openIntent={openIntent}
+                  openDesk={openDesk}
                   capture={() => capture()}
                   openBoard={() => openBoard()}
                   openCalendar={() => navigate('calendar')}
@@ -746,6 +792,10 @@ export default function Studio() {
                     ← All projects
                   </button>
                   {board}
+                  <ConnectedNotes
+                    data={data}
+                    target={{ type: 'project', id: projectId }}
+                  />
                   <RelatedResources
                     target={{ type: 'project', id: projectId }}
                   />
@@ -962,11 +1012,11 @@ export default function Studio() {
           </SheetContent>
         </Sheet>
         <Dialog open={create} onOpenChange={setCreate}>
-          <DialogContent className="create-dialog">
+          <DialogContent className="create-dialog universal-capture-dialog">
             <DialogHeader>
-              <DialogTitle>Create a task</DialogTitle>
+              <DialogTitle>Capture what’s on your mind</DialogTitle>
               <DialogDescription>
-                Capture it now. Keep the context with it.
+                A note, task, meeting, or deadline. See where it belongs.
               </DialogDescription>
             </DialogHeader>
             {error && (
@@ -976,6 +1026,9 @@ export default function Studio() {
             )}
             <QuickCapture
               key={captureKey}
+              draftId="overlay"
+              spaceId={spaceId}
+              onOpenEntry={openEntry}
               data={data}
               ready={ready}
               busy={busy}
@@ -984,14 +1037,20 @@ export default function Studio() {
               projectId={projectId}
               close={() => setCreate(false)}
               drafts={captureDrafts.current}
-              onCreated={(id) => {
-                setCreate(false);
-                openTask(id);
-              }}
+              onCreated={() => {}}
             />
           </DialogContent>
         </Dialog>
+        <CapturedNote
+          entry={data.captureEntries.find((e) => e.id === capturedNoteId)}
+          data={data}
+          close={() => setCapturedNoteId(null)}
+          openSpace={space}
+          openProject={project}
+          openTask={openTask}
+        />
         <IntentPalette
+          openEntry={openEntry}
           openSales={() => navigate('sales')}
           openProspect={openProspect}
           data={data}
@@ -1265,6 +1324,7 @@ function TaskDetail({
               </form>
             </CollapsibleContent>
           </Collapsible>
+          <ConnectedNotes data={data} target={{ type: 'task', id: task.id }} />
           <RelatedResources target={{ type: 'task', id: task.id }} />
           <h3 className="detail-heading">Notes & decisions</h3>
           {data.notes

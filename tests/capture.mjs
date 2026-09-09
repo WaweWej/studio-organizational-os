@@ -1,40 +1,319 @@
 import assert from 'node:assert/strict';
-import {mkdir,writeFile} from 'node:fs/promises';
-import {initialWorkspace} from '../lib/model.ts';
-import {parseCapture,captureDate,activeMention,mentionSuggestions,shiftMentionPins} from '../lib/task-capture.ts';
-import {taskSpaceId} from '../lib/task-context.ts';
-import {calendarEntries} from '../lib/calendar-model.ts';
-import {relatedResources} from '../lib/resource-model.ts';
-const data=initialWorkspace(),now=new Date(2026,8,8,12),options={now};
-let parsed=parseCapture('Book meeting with @Nord & Form at date @12/05',data,options);
-assert.equal(parsed.title,'Book meeting with Nord & Form');assert.equal(parsed.spaceId,'nord');assert.equal(parsed.projectId,null);assert.equal(parsed.due,'2027-05-12');assert.deepEqual(parsed.errors,[]);
-parsed=parseCapture('Edit launch video for @Autumn launch @nord',data,options);assert.equal(parsed.projectId,'autumn');assert.equal(parsed.spaceId,'nord');assert.deepEqual(parsed.errors,[]);
-assert.equal(parseCapture('Edit launch video @autumn',data,options).spaceId,'nord');
-assert.equal(parseCapture('Write the outline',data,{...options,projectId:'autumn'}).projectId,'autumn');
-assert.equal(parseCapture('Call @harbor',data,{...options,projectId:'autumn'}).projectId,null,'An explicit standalone client replaces an incompatible board default.');
-assert(parseCapture('Edit @autumn @harbor',data,options).errors.some(e=>e.includes('do not match')));
-assert(parseCapture('Call @nord @harbor',data,options).errors.some(e=>e.includes('one client')));
-assert(parseCapture('Edit @autumn @social',data,options).errors.some(e=>e.includes('one project')));
-assert(parseCapture('Ship @today @tomorrow',data,options).errors.some(e=>e.includes('one deadline')));
-assert(parseCapture('Call @missing-client',data,options).errors.length);
-assert.deepEqual(parseCapture('Email person@example.com',data,options).errors,[]);
-assert(parseCapture('x'.repeat(181),data,options).errors.length);
-assert.equal(captureDate('12/05',now),'2027-05-12');assert.equal(captureDate('12/05/2026',now),'2026-05-12');assert.equal(captureDate('2026-12-05',now),'2026-12-05');assert.equal(captureDate('31/02',now),null);assert.equal(captureDate('29/02/2027',now),null);assert.equal(captureDate('29/02',now),'2028-02-29');assert.equal(captureDate('tomorrow',new Date(2026,11,31,12)),'2027-01-01');assert.equal(captureDate('today',now),'2026-09-08');assert.equal(captureDate('nextweek',now),'2026-09-15');assert.equal(captureDate('12/13',now),null);
-const duplicate={...data,spaces:[...data.spaces,{...data.spaces[0],id:'second-nord'}]};const sentence='Call @Nord & Form';assert(parseCapture(sentence,duplicate,options).errors.some(e=>e.includes('more than one')));const pin={start:5,end:17,kind:'space',id:'second-nord',label:'Nord & Form'};assert.equal(parseCapture(sentence,duplicate,{...options,pins:[pin]}).spaceId,'second-nord');
-const prefixed='Tomorrow: '+sentence,movedPins=shiftMentionPins(sentence,prefixed,[pin]);assert.equal(movedPins[0].start,15);assert.equal(parseCapture(prefixed,duplicate,{...options,pins:movedPins}).spaceId,'second-nord');assert.equal(shiftMentionPins(sentence,'Call @Harbor Coffee',[pin]).length,0);
-const resolved=parseCapture(sentence+' ',data,options);assert.equal(activeMention(sentence+' ',18,resolved.mentions),null);assert.equal(activeMention('Call @ha',8,[]).query,'ha');assert(mentionSuggestions('harb',data,now).some(o=>o.id==='harbor'));assert(mentionSuggestions('12/05',data,now).some(o=>o.id==='2027-05-12'));
-data.tasks.push({...data.tasks[0],id:'standalone',projectId:null,spaceId:'harbor',title:'Standalone client task',due:'2026-10-12'});assert.equal(taskSpaceId(data,data.tasks.at(-1)),'harbor');assert.equal(calendarEntries(data).find(e=>e.id==='standalone').spaceId,'harbor');data.resources=[{id:'brand',title:'Brand guidelines',kind:'template',archived:0,shared:0},{id:'task-file',title:'Meeting reference',kind:'asset',archived:0,shared:0}];data.resourceLinks=[{resourceId:'brand',targetType:'space',targetId:'harbor'},{resourceId:'task-file',targetType:'task',targetId:'standalone'}];assert.equal(relatedResources(data,{type:'task',id:'standalone'}).length,2);assert(relatedResources(data,{type:'space',id:'harbor'}).some(r=>r.id==='task-file'));assert(!relatedResources(data,{type:'space',id:'nord'}).some(r=>r.id==='task-file'));
-const base='http://localhost:5173',ids=[],resourceIds=[];
-async function api(command,other=false){const r=await fetch(base+'/api/workspace',{method:command?'POST':'GET',headers:{...(other?{}:{Cookie:'__sites_local_auth=1'}),...(command?{'Content-Type':'application/json'}:{})},body:command?JSON.stringify(command):undefined});return {status:r.status,data:await r.json()}}
-const capture=(fields={})=>({type:'quick-create',captureId:crypto.randomUUID(),title:'[Verification] Capture task',captureText:'[Verification] Capture @harbor @12/05',spaceId:'harbor',projectId:'',due:'2027-05-12',...fields});
-try{
- const first=capture();ids.push(first.captureId);let r=await api(first);assert.equal(r.status,200,JSON.stringify(r.data));let task=r.data.tasks.find(t=>t.id===first.captureId);assert.equal(task.spaceId,'harbor');assert.equal(task.projectId,null);assert.equal(task.assignee,r.data.currentMember);assert.equal(task.stage,'Up next');assert.equal(taskSpaceId(r.data,task),'harbor');assert.equal(calendarEntries(r.data).find(e=>e.id===task.id).spaceId,'harbor');assert.equal(r.data.activities.filter(a=>a.taskId===task.id).length,1);assert(r.data.activities.find(a=>a.taskId===task.id).body.includes('@harbor'));
- const before=r.data.tasks.length;r=await api(first);assert.equal(r.status,200);assert.equal(r.data.tasks.length,before);assert.equal(r.data.activities.filter(a=>a.taskId===task.id).length,1);
- assert.equal((await api({...first,title:'Different title'})).status,409);
- const second=capture({title:'[Verification] Project capture',spaceId:'nord',projectId:'autumn',assignee:'emma'});ids.push(second.captureId);r=await api(second);assert.equal(r.status,200);task=r.data.tasks.find(t=>t.id===second.captureId);assert.equal(task.spaceId,null);assert.equal(taskSpaceId(r.data,task),'nord');assert.equal(task.assignee,r.data.currentMember,'Capture defaults to the authenticated actor.');assert(task.position<r.data.tasks.find(t=>t.id===first.captureId).position);
- assert.equal((await api(capture({spaceId:'harbor',projectId:'autumn'}))).status,400);assert.equal((await api(capture({spaceId:'missing-space'}))).status,404);assert.equal((await api(capture({due:'2027-02-31'}))).status,400);assert.equal((await api(capture({captureId:'bad-id'}))).status,400);
- assert.equal((await api({type:'deadline',id:first.captureId,revision:0,due:'2027-10-10'},true)).status,404);
- const simultaneous=capture({title:'[Verification] Concurrent capture'});ids.push(simultaneous.captureId);const raced=await Promise.all([api(simultaneous),api(simultaneous)]);assert(raced.every(r=>r.status===200));r=await api();assert.equal(r.data.tasks.filter(t=>t.id===simultaneous.captureId).length,1);assert.equal(r.data.activities.filter(a=>a.taskId===simultaneous.captureId).length,1);
- const reference=crypto.randomUUID();resourceIds.push(reference);r=await api({type:'resource-save',id:reference,title:'[Verification] Client brief',kind:'asset',source:'link',url:'https://example.com/brief',owner:'me',shared:false,targets:[{type:'space',id:'harbor'}]});assert.equal(r.status,200);assert(relatedResources(r.data,{type:'task',id:first.captureId}).some(a=>a.id===reference));
- console.log('PASS: client/project/date parsing, DD/MM and leap dates, ambiguity and conflict handling, selected identities through edits, standalone client context across calendar/library, canonical capture persistence, actor assignment, retry and concurrent deduplication, tenant checks, and capture history.');
-}finally{await mkdir('work',{recursive:true});for(const id of [...ids,...resourceIds])assert.match(id,/^[a-f0-9-]+$/);await writeFile('work/capture-cleanup.sql',[...ids.flatMap(id=>[...['notes','activities','reviews','notices'].map(table=>`DELETE FROM ${table} WHERE org='local_seedy' AND taskId='${id}';`),`DELETE FROM tasks WHERE org='local_seedy' AND id='${id}';`]),...resourceIds.flatMap(id=>[`DELETE FROM resourceLinks WHERE org='local_seedy' AND resourceId='${id}';`,`DELETE FROM resources WHERE org='local_seedy' AND id='${id}';`])].join('\n'));}
+import { mkdir, writeFile } from 'node:fs/promises';
+import { initialWorkspace } from '../lib/model.ts';
+import {
+  parseCapture,
+  captureDate,
+  activeMention,
+  mentionSuggestions,
+  shiftMentionPins,
+} from '../lib/task-capture.ts';
+import { taskSpaceId } from '../lib/task-context.ts';
+import { calendarEntries } from '../lib/calendar-model.ts';
+import { relatedResources } from '../lib/resource-model.ts';
+const data = initialWorkspace(),
+  now = new Date(2026, 8, 8, 12),
+  options = { now };
+let parsed = parseCapture(
+  'Book meeting with @Nord & Form at date @12/05',
+  data,
+  options,
+);
+assert.equal(parsed.title, 'Book meeting with Nord & Form');
+assert.equal(parsed.spaceId, 'nord');
+assert.equal(parsed.projectId, null);
+assert.equal(parsed.due, '2027-05-12');
+assert.deepEqual(parsed.errors, []);
+parsed = parseCapture(
+  'Edit launch video for @Autumn launch @nord',
+  data,
+  options,
+);
+assert.equal(parsed.projectId, 'autumn');
+assert.equal(parsed.spaceId, 'nord');
+assert.deepEqual(parsed.errors, []);
+assert.equal(
+  parseCapture('Edit launch video @autumn', data, options).spaceId,
+  'nord',
+);
+assert.equal(
+  parseCapture('Write the outline', data, { ...options, projectId: 'autumn' })
+    .projectId,
+  'autumn',
+);
+assert.equal(
+  parseCapture('Call @harbor', data, { ...options, projectId: 'autumn' })
+    .projectId,
+  null,
+  'An explicit standalone client replaces an incompatible board default.',
+);
+assert(
+  parseCapture('Edit @autumn @harbor', data, options).errors.some((e) =>
+    e.includes('do not match'),
+  ),
+);
+assert(
+  parseCapture('Call @nord @harbor', data, options).errors.some((e) =>
+    e.includes('one client'),
+  ),
+);
+assert(
+  parseCapture('Edit @autumn @social', data, options).errors.some((e) =>
+    e.includes('one project'),
+  ),
+);
+assert(
+  parseCapture('Ship @today @tomorrow', data, options).errors.some((e) =>
+    e.includes('one deadline'),
+  ),
+);
+assert(parseCapture('Call @missing-client', data, options).errors.length);
+assert.deepEqual(
+  parseCapture('Email person@example.com', data, options).errors,
+  [],
+);
+assert(parseCapture('x'.repeat(181), data, options).errors.length);
+assert.equal(captureDate('12/05', now), '2027-05-12');
+assert.equal(captureDate('12/05/2026', now), '2026-05-12');
+assert.equal(captureDate('2026-12-05', now), '2026-12-05');
+assert.equal(captureDate('31/02', now), null);
+assert.equal(captureDate('29/02/2027', now), null);
+assert.equal(captureDate('29/02', now), '2028-02-29');
+assert.equal(captureDate('tomorrow', new Date(2026, 11, 31, 12)), '2027-01-01');
+assert.equal(captureDate('today', now), '2026-09-08');
+assert.equal(captureDate('nextweek', now), '2026-09-15');
+assert.equal(captureDate('12/13', now), null);
+const duplicate = {
+  ...data,
+  spaces: [...data.spaces, { ...data.spaces[0], id: 'second-nord' }],
+};
+const sentence = 'Call @Nord & Form';
+assert(
+  parseCapture(sentence, duplicate, options).errors.some((e) =>
+    e.includes('more than one'),
+  ),
+);
+const pin = {
+  start: 5,
+  end: 17,
+  kind: 'space',
+  id: 'second-nord',
+  label: 'Nord & Form',
+};
+assert.equal(
+  parseCapture(sentence, duplicate, { ...options, pins: [pin] }).spaceId,
+  'second-nord',
+);
+const prefixed = 'Tomorrow: ' + sentence,
+  movedPins = shiftMentionPins(sentence, prefixed, [pin]);
+assert.equal(movedPins[0].start, 15);
+assert.equal(
+  parseCapture(prefixed, duplicate, { ...options, pins: movedPins }).spaceId,
+  'second-nord',
+);
+assert.equal(
+  shiftMentionPins(sentence, 'Call @Harbor Coffee', [pin]).length,
+  0,
+);
+const resolved = parseCapture(sentence + ' ', data, options);
+assert.equal(activeMention(sentence + ' ', 18, resolved.mentions), null);
+assert.equal(activeMention('Call @ha', 8, []).query, 'ha');
+assert(mentionSuggestions('harb', data, now).some((o) => o.id === 'harbor'));
+assert(
+  mentionSuggestions('12/05', data, now).some((o) => o.id === '2027-05-12'),
+);
+data.tasks.push({
+  ...data.tasks[0],
+  id: 'standalone',
+  projectId: null,
+  spaceId: 'harbor',
+  title: 'Standalone client task',
+  due: '2026-10-12',
+});
+assert.equal(taskSpaceId(data, data.tasks.at(-1)), 'harbor');
+assert.equal(
+  calendarEntries(data).find((e) => e.id === 'standalone').spaceId,
+  'harbor',
+);
+data.resources = [
+  {
+    id: 'brand',
+    title: 'Brand guidelines',
+    kind: 'template',
+    archived: 0,
+    shared: 0,
+  },
+  {
+    id: 'task-file',
+    title: 'Meeting reference',
+    kind: 'asset',
+    archived: 0,
+    shared: 0,
+  },
+];
+data.resourceLinks = [
+  { resourceId: 'brand', targetType: 'space', targetId: 'harbor' },
+  { resourceId: 'task-file', targetType: 'task', targetId: 'standalone' },
+];
+assert.equal(
+  relatedResources(data, { type: 'task', id: 'standalone' }).length,
+  2,
+);
+assert(
+  relatedResources(data, { type: 'space', id: 'harbor' }).some(
+    (r) => r.id === 'task-file',
+  ),
+);
+assert(
+  !relatedResources(data, { type: 'space', id: 'nord' }).some(
+    (r) => r.id === 'task-file',
+  ),
+);
+const base = 'http://localhost:5173',
+  ids = [],
+  resourceIds = [];
+async function api(command, other = false) {
+  const r = await fetch(base + '/api/workspace', {
+    method: command ? 'POST' : 'GET',
+    headers: {
+      ...(other ? {} : { Cookie: '__sites_local_auth=1' }),
+      ...(command ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: command ? JSON.stringify(command) : undefined,
+  });
+  return { status: r.status, data: await r.json() };
+}
+const capture = (fields = {}) => ({
+  type: 'quick-create',
+  captureId: crypto.randomUUID(),
+  title: '[Verification] Capture task',
+  captureText: '[Verification] Capture @harbor @12/05',
+  spaceId: 'harbor',
+  projectId: '',
+  due: '2027-05-12',
+  ...fields,
+});
+try {
+  const first = capture();
+  ids.push(first.captureId);
+  let r = await api(first);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  let task = r.data.tasks.find((t) => t.id === first.captureId);
+  assert.equal(task.spaceId, 'harbor');
+  assert.equal(task.projectId, null);
+  assert.equal(task.assignee, r.data.currentMember);
+  assert.equal(task.stage, 'Up next');
+  assert.equal(taskSpaceId(r.data, task), 'harbor');
+  assert.equal(
+    calendarEntries(r.data).find((e) => e.id === task.id).spaceId,
+    'harbor',
+  );
+  assert.equal(r.data.activities.filter((a) => a.taskId === task.id).length, 1);
+  assert(
+    r.data.activities
+      .find((a) => a.taskId === task.id)
+      .body.includes('@harbor'),
+  );
+  const before = r.data.tasks.length;
+  r = await api(first);
+  assert.equal(r.status, 200);
+  assert.equal(r.data.tasks.length, before);
+  assert.equal(r.data.activities.filter((a) => a.taskId === task.id).length, 1);
+  assert.equal((await api({ ...first, title: 'Different title' })).status, 409);
+  const second = capture({
+    title: '[Verification] Project capture',
+    spaceId: 'nord',
+    projectId: 'autumn',
+    assignee: 'emma',
+  });
+  ids.push(second.captureId);
+  r = await api(second);
+  assert.equal(r.status, 200);
+  task = r.data.tasks.find((t) => t.id === second.captureId);
+  assert.equal(task.spaceId, null);
+  assert.equal(taskSpaceId(r.data, task), 'nord');
+  assert.equal(
+    task.assignee,
+    r.data.currentMember,
+    'Capture defaults to the authenticated actor.',
+  );
+  assert(
+    task.position < r.data.tasks.find((t) => t.id === first.captureId).position,
+  );
+  assert.equal(
+    (await api(capture({ spaceId: 'harbor', projectId: 'autumn' }))).status,
+    400,
+  );
+  assert.equal((await api(capture({ spaceId: 'missing-space' }))).status, 404);
+  assert.equal((await api(capture({ due: '2027-02-31' }))).status, 400);
+  assert.equal((await api(capture({ captureId: 'bad-id' }))).status, 400);
+  assert.equal(
+    (
+      await api(
+        {
+          type: 'deadline',
+          id: first.captureId,
+          revision: 0,
+          due: '2027-10-10',
+        },
+        true,
+      )
+    ).status,
+    404,
+  );
+  const simultaneous = capture({ title: '[Verification] Concurrent capture' });
+  ids.push(simultaneous.captureId);
+  const raced = await Promise.all([api(simultaneous), api(simultaneous)]);
+  assert(raced.every((r) => r.status === 200));
+  r = await api();
+  assert.equal(
+    r.data.tasks.filter((t) => t.id === simultaneous.captureId).length,
+    1,
+  );
+  assert.equal(
+    r.data.activities.filter((a) => a.taskId === simultaneous.captureId).length,
+    1,
+  );
+  const reference = crypto.randomUUID();
+  resourceIds.push(reference);
+  r = await api({
+    type: 'resource-save',
+    id: reference,
+    title: '[Verification] Client brief',
+    kind: 'asset',
+    source: 'link',
+    url: 'https://example.com/brief',
+    owner: 'me',
+    shared: false,
+    targets: [{ type: 'space', id: 'harbor' }],
+  });
+  assert.equal(r.status, 200);
+  assert(
+    relatedResources(r.data, { type: 'task', id: first.captureId }).some(
+      (a) => a.id === reference,
+    ),
+  );
+  console.log(
+    'PASS: client/project/date parsing, DD/MM and leap dates, ambiguity and conflict handling, selected identities through edits, standalone client context across calendar/library, canonical capture persistence, actor assignment, retry and concurrent deduplication, tenant checks, and capture history.',
+  );
+} finally {
+  await mkdir('work', { recursive: true });
+  for (const id of [...ids, ...resourceIds]) assert.match(id, /^[a-f0-9-]+$/);
+  await writeFile(
+    'work/capture-cleanup.sql',
+    [
+      ...ids.flatMap((id) => [
+        ...['notes', 'activities', 'reviews', 'notices'].map(
+          (table) =>
+            `DELETE FROM ${table} WHERE org='local_seedy' AND taskId='${id}';`,
+        ),
+        `DELETE FROM tasks WHERE org='local_seedy' AND id='${id}';`,
+        `DELETE FROM captureEntries WHERE org='local_seedy' AND id='${id}';`,
+      ]),
+      ...resourceIds.flatMap((id) => [
+        `DELETE FROM resourceLinks WHERE org='local_seedy' AND resourceId='${id}';`,
+        `DELETE FROM resources WHERE org='local_seedy' AND id='${id}';`,
+      ]),
+    ].join('\n'),
+  );
+}

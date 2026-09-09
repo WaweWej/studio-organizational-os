@@ -1,3 +1,4 @@
+import { mutateEntry, captureInsert } from './entry-store';
 import { mutateSales } from './sales-store';
 import { mutateResource, upgradeResources } from './resource-store';
 import { mutateClient } from './client-store';
@@ -14,6 +15,7 @@ import {
 } from './validation';
 
 const collections = [
+  'captureEntries',
   'prospects',
   'prospectEvents',
   'members',
@@ -178,6 +180,10 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
   const type = textValue(input.type, 'Action', 40, true),
     now = new Date().toISOString(),
     nonce = crypto.randomUUID();
+  if (type === 'capture-entry') {
+    await mutateEntry(c, input);
+    return;
+  }
   if (type.startsWith('sales-')) {
     await mutateSales(c, input);
     return;
@@ -307,6 +313,30 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
         },
         { id: t.id, nonce },
       ),
+      ...(type === 'quick-create'
+        ? [
+            captureInsert(
+              c,
+              {
+                id: t.id,
+                kind: 'task',
+                sourceText: captureText,
+                title: t.title,
+                body: '',
+                targetType: 'task',
+                targetId: t.id,
+                spaceId: directSpaceId,
+                projectId: t.projectId,
+                taskId: t.id,
+                actor: c.actor,
+                createdAt: now,
+              },
+              nonce,
+              '',
+              { taskId: t.id },
+            ),
+          ]
+        : []),
     ]);
     if (!result[0].meta.changes && type === 'quick-create') {
       const existing = await c.db

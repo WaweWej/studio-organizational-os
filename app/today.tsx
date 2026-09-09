@@ -41,6 +41,7 @@ export default function Today({
   openBrief,
   openSpace,
   openIntent,
+  openDesk,
   capture,
   openBoard,
   openCalendar,
@@ -51,6 +52,7 @@ export default function Today({
   openBrief: (id: string) => void;
   openSpace: (id: string) => void;
   openIntent: (query?: string) => void;
+  openDesk: () => void;
   capture: () => void;
   openBoard: () => void;
   openCalendar: () => void;
@@ -91,23 +93,22 @@ export default function Today({
           <p>Your work, with the context already here.</p>
         </div>
         <button className="os-button" onClick={capture} disabled={!ready}>
-          <Plus size={16} /> Capture a task <kbd>↵</kbd>
+          <Plus size={16} /> Capture anything <kbd>↵</kbd>
         </button>
       </header>
-      <button
-        className="desk-intent"
-        onClick={() => openIntent()}
-        disabled={!ready}
-      >
+      <button className="desk-intent" onClick={openDesk} disabled={!ready}>
         <span className="intent-symbol">
           <ScanLine size={23} />
         </span>
         <span>
-          <strong>What would you like to move forward?</strong>
-          <small>Prepare a meeting, find something, or capture a task.</small>
+          <strong>Your desk for the whole day.</strong>
+          <small>
+            Jot notes, meetings, tasks, and deadlines. Keep everything
+            connected.
+          </small>
         </span>
         <span className="intent-shortcut">
-          <kbd>⌘ / Ctrl K</kbd>
+          <span>Open desk</span>
           <ArrowRight size={20} />
         </span>
       </button>

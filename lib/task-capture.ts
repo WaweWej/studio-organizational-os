@@ -130,7 +130,9 @@ export function parseCapture(
         p.start === start &&
         p.kind !== 'date' &&
         text.slice(p.start, p.end) === '@' + p.label &&
-        catalog.some((c) => c.kind === p.kind && c.id === p.id),
+        catalog.some(
+          (c) => c.kind === p.kind && c.id === p.id && c.label === p.label,
+        ),
     );
     if (pin) {
       mentions.push(pin);
@@ -138,7 +140,7 @@ export function parseCapture(
     }
     const rest = text.slice(start + 1),
       dateRaw = rest.match(
-        /^(today|tomorrow|nextweek|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{4})?)(?=$|[\s,;.!?)])/i,
+        /^(today|tomorrow|nextweek|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{4})?)(?=$|[\s,:;.!?)])/i,
       )?.[0];
     if (dateRaw) {
       const due = captureDate(dateRaw, now);
@@ -161,7 +163,7 @@ export function parseCapture(
         .filter(
           (a) =>
             rest.toLowerCase().startsWith(a.toLowerCase()) &&
-            (!rest[a.length] || /[\s,;.!?)]/.test(rest[a.length])),
+            (!rest[a.length] || /[\s,:;.!?)]/.test(rest[a.length])),
         )
         .map((a) => ({ option: c, length: a.length })),
     );

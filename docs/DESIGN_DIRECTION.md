@@ -14,15 +14,16 @@ The previous interface put every module in the navigation and asked people to as
 4. **Act.** Existing task, review, meeting, and resource commands remain authoritative. Search and interpretation lead to those same interactions.
 5. **Remember.** Notes, decisions, links, review versions, and activity remain attached to their canonical records. The next brief reads those updated records.
 
-## Five stable places
+## Six stable places
 
-| Place   | The question it answers                              | Secondary views                                                 |
-| ------- | ---------------------------------------------------- | --------------------------------------------------------------- |
-| Today   | What needs me, and where do I continue?              | Brief, my board, team board                                     |
-| Spaces  | Who are we doing this for, and what matters to them? | Branded client home, meetings, work, references, sales pipeline |
-| Work    | What are we delivering together?                     | Projects, shared calendar, project board                        |
-| Library | Where is the thing I need?                           | Assets, templates, custom tools, vault                          |
-| Systems | How does this organization operate?                  | Process records, connection coverage                            |
+| Place   | The question it answers                              | Secondary views                                  |
+| ------- | ---------------------------------------------------- | ------------------------------------------------ |
+| Today   | What needs me, and where do I continue?              | Desk, brief, my board, team board                      |
+| Spaces  | Who are we doing this for, and what matters to them? | Branded client home, meetings, work, references  |
+| Sales   | Which relationships are moving toward a sale?        | Prospects, conversations, pipeline, next actions |
+| Work    | What are we delivering together?                     | Projects, shared calendar, project board         |
+| Library | Where is the thing I need?                           | Assets, templates, custom tools, vault           |
+| Systems | How does this organization operate?                  | Process records, connection coverage             |
 
 People and internal documents remain accessible through Workspace. Existing direct URLs continue to work. These places are reliable orientation points; they are not required steps before every action.
 
@@ -76,3 +77,13 @@ The workspace still has one authenticated owner and sample colleagues. Real team
 “Sales meeting with "Acme", next step: calculate lead price” is interpreted as a prospect interaction with a linked task. Capture previews both outcomes. The server parses the sentence again, validates the date and next step, and saves prospect lookup/creation, conversation, task, and activity atomically. Case and whitespace normalized exact names reuse an existing prospect. Ambiguous fuzzy matching is intentionally avoided. Retrying the same capture does not duplicate effects.
 
 Prospects have their own pipeline stages and history; active clients retain their richer brand spaces. Sales stage changes do not alter task progress, and completing a next step does not advance a prospect. The next action is assigned to the authenticated actor, visible on their board, and linked back to the sales history. A won prospect does not automatically become an active client yet.
+
+## The screen that stays open
+
+Today’s Desk is a continuous capture surface. Enter focuses capture; saving clears the input and preserves a durable entry with a link to its destination. Notes, tasks, client meetings, deadline changes, and sales conversations share the same input. Sales has its own primary navigation item.
+
+Explicit note/meeting/deadline phrases and common action verbs determine the initial type. People can override the type and select a destination. Unrecognized text defaults to a note on the desk, never a silently invented task. Existing client/project context is inherited, with explicit references taking precedence and conflicts surfaced. This uses deterministic interpretation; a model remains unconnected.
+
+Capture entries hold canonical notes and receipts for other records. Connected notes appear with the client, project, and task, while the original entry remains searchable and visible in Desk history. Notes from sibling tasks do not leak into each other’s context. Meeting captures create client meeting records, not calendar invitations. Deadline captures update existing task/project dates. Every mutation is scoped to the authenticated workspace, and related history is written atomically with its record.
+
+The future AI contract is to propose those same typed destinations and commands, preserving the source text, correction path, and explicit uncertainty. Its success is measured by how little organizational effort the employee needs after writing something down.

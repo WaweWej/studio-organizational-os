@@ -1,4 +1,6 @@
 'use client';
+import { inferEntryKind, type CaptureEntry } from '@/lib/entry-model';
+
 import {
   ScanLine,
   Plus,
@@ -44,6 +46,7 @@ export default function IntentPalette({
   openToday,
   openProspect,
   openSales,
+  openEntry,
 }: {
   data: Workspace;
   open: boolean;
@@ -56,6 +59,7 @@ export default function IntentPalette({
   openDocument: (id: string) => void;
   openProspect: (id: string) => void;
   openSales: () => void;
+  openEntry: (entry: CaptureEntry) => void;
   openBrief: (id: string) => void;
   capture: (text?: string) => void;
   openBoard: () => void;
@@ -64,6 +68,7 @@ export default function IntentPalette({
   const now = useWorkspaceClock();
   const { requested, spaces } = briefMatches(query, data);
   const sales = parseSalesCapture(query);
+  const kind = inferEntryKind(query);
   const daily = buildDailyBrief(data, now);
   const next = daily.upcoming[0];
   const go = (action: () => void) => {
@@ -183,8 +188,8 @@ export default function IntentPalette({
                 {sales
                   ? 'Record a sales conversation & next step'
                   : query.trim()
-                    ? 'Use this sentence to create a task'
-                    : 'Capture a task'}
+                    ? 'Capture this ' + kind
+                    : 'Capture anything'}
                 <small>
                   {query.trim() ||
                     'Write naturally. Connect @clients, @projects, and dates.'}
@@ -259,6 +264,30 @@ export default function IntentPalette({
                 ))}
               </CommandGroup>
               <ResourceCommands done={() => setOpen(false)} />
+              <CommandGroup heading="Saved notes">
+                {data.captureEntries
+                  .filter((e) => e.kind === 'note')
+                  .map((e) => (
+                    <CommandItem
+                      key={e.id}
+                      value={
+                        e.title +
+                        ' ' +
+                        e.body +
+                        ' ' +
+                        (data.spaces.find((s) => s.id === e.spaceId)?.name ||
+                          '') +
+                        ' ' +
+                        (data.projects.find((p) => p.id === e.projectId)
+                          ?.name || '')
+                      }
+                      onSelect={() => go(() => openEntry(e))}
+                    >
+                      <FileText size={16} />
+                      {e.title}
+                    </CommandItem>
+                  ))}
+              </CommandGroup>
               <CommandGroup heading="Documents">
                 {data.documents.map((d) => (
                   <CommandItem

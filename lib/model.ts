@@ -1,3 +1,4 @@
+import type { CaptureEntry } from './entry-model';
 import type { Prospect, ProspectEvent } from './sales-model';
 import type {
   Resource,
@@ -116,6 +117,7 @@ export type Document = {
   body: string;
 };
 export type Workspace = {
+  captureEntries: CaptureEntry[];
   prospects: Prospect[];
   prospectEvents: ProspectEvent[];
   resources: Resource[];
@@ -277,6 +279,7 @@ export function initialWorkspace(): Workspace {
     }),
   );
   return {
+    captureEntries: [],
     prospects: [],
     prospectEvents: [],
     resources: [],

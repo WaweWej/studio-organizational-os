@@ -18,12 +18,26 @@ import {
   CommandItem,
   CommandEmpty,
 } from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import {
+  interpretEntry,
+  captureDestination,
+  type CaptureEntry,
+  type EntryKind,
+  type EntryTarget,
+} from '@/lib/entry-model';
 import { Button } from '@/components/ui/button';
 import type { Workspace } from '@/lib/model';
 import { parseSalesCapture } from '@/lib/sales-model';
 import { localDay } from '@/lib/workspace-brief';
 import {
-  parseCapture,
   activeMention,
   mentionSuggestions,
   shiftMentionPins,
@@ -35,6 +49,11 @@ export type CaptureDraft = {
   text: string;
   pins: CaptureMention[];
   contextProject: string | null;
+  contextSpace?: string | null;
+  kind?: EntryKind | 'auto';
+  target?: EntryTarget | null;
+  meetingDate?: string;
+  meetingTime?: string;
 };
 export default function QuickCapture({
   data,
@@ -43,10 +62,13 @@ export default function QuickCapture({
   error,
   act,
   projectId,
+  spaceId,
   enabled = true,
   close,
   onCreated,
+  onOpenEntry,
   drafts,
+  draftId,
 }: {
   data: Workspace;
   ready: boolean;
@@ -54,32 +76,69 @@ export default function QuickCapture({
   error: string;
   act: (v: Record<string, unknown>) => Promise<boolean>;
   projectId?: string | null;
+  spaceId?: string | null;
   enabled?: boolean;
   close: () => void;
-  onCreated: (id: string, title: string) => void;
+  onCreated: (id: string, title: string, kind?: EntryKind) => void;
+  onOpenEntry?: (entry: CaptureEntry) => void;
   drafts: Map<string, CaptureDraft>;
+  draftId?: string;
 }) {
-  const draftKey = projectId || 'workspace',
+  const draftKey = draftId || projectId || 'workspace',
     initial = drafts.get(draftKey);
   const [text, setText] = useState(initial?.text || ''),
     [pins, setPins] = useState<CaptureMention[]>(initial?.pins || []),
     [contextProject, setContextProject] = useState(
-      initial ? initial.contextProject : projectId || null,
+      initial?.text.trim() ? initial.contextProject : projectId || null,
     ),
+    [contextSpace, setContextSpace] = useState(
+      initial?.text.trim() ? initial.contextSpace || null : spaceId || null,
+    ),
+    [kind, setKind] = useState<EntryKind | 'auto'>(initial?.kind || 'auto'),
+    [target, setTarget] = useState<EntryTarget | null>(initial?.target || null),
+    [meetingDate, setMeetingDate] = useState(initial?.meetingDate || ''),
+    [meetingTime, setMeetingTime] = useState(initial?.meetingTime || ''),
+    [savedId, setSavedId] = useState<string | null>(null),
     [caret, setCaret] = useState(text.length),
     [choice, setChoice] = useState(''),
     [dismissed, setDismissed] = useState(''),
-    [attempted, setAttempted] = useState(false),
     [saving, setSaving] = useState(false);
   const input = useRef<HTMLInputElement>(null),
     submitting = useRef(false),
     request = useRef<{ fingerprint: string; id: string } | null>(null),
     helpId = useId();
-  const sales = parseSalesCapture(text);
+  const entry = interpretEntry(text, data, {
+    kind,
+    projectId: contextProject,
+    spaceId: contextSpace,
+    pins,
+    target,
+    meetingDate,
+    meetingTime,
+  });
+  if (
+    entry.kind === 'meeting' &&
+    entry.meetingDate &&
+    /^([01]\d|2[0-3]):[0-5]\d$/.test(entry.meetingTime)
+  ) {
+    const local = new Date(`${entry.meetingDate}T${entry.meetingTime}:00`);
+    if (
+      !Number.isFinite(local.getTime()) ||
+      localDay(local) !== entry.meetingDate ||
+      `${String(local.getHours()).padStart(2, '0')}:${String(local.getMinutes()).padStart(2, '0')}` !==
+        entry.meetingTime
+    )
+      entry.errors.push(
+        'That local time does not exist on this date. Choose another time.',
+      );
+  }
+  const sales = entry.kind === 'sales' ? parseSalesCapture(text) : null;
+  const selectedSpace = data.spaces.find((s) => s.id === entry.spaceId);
+  const savedEntry = data.captureEntries.find((e) => e.id === savedId);
   const existingProspect = sales
     ? data.prospects.find((p) => p.nameKey === sales.nameKey)
     : undefined;
-  const parsed = parseCapture(text, data, { projectId: contextProject, pins }),
+  const parsed = entry.parsed,
     active = sales ? null : activeMention(text, caret, parsed.mentions),
     queryKey = active ? `${active.start}:${active.query}` : '',
     suggestions =
@@ -99,8 +158,28 @@ export default function QuickCapture({
       m.id === selected?.id,
   );
   useEffect(() => {
-    drafts.set(draftKey, { text, pins, contextProject });
-  }, [drafts, draftKey, text, pins, contextProject]);
+    drafts.set(draftKey, {
+      text,
+      pins,
+      contextProject,
+      contextSpace,
+      kind,
+      target,
+      meetingDate,
+      meetingTime,
+    });
+  }, [
+    drafts,
+    draftKey,
+    text,
+    pins,
+    contextProject,
+    contextSpace,
+    kind,
+    target,
+    meetingDate,
+    meetingTime,
+  ]);
   useEffect(() => {
     if (enabled) input.current?.focus();
   }, [enabled]);
@@ -116,7 +195,7 @@ export default function QuickCapture({
     setPins((previous) => shiftMentionPins(text, next, previous));
     setText(next);
     setCaret(nextCaret ?? input.current?.selectionStart ?? next.length);
-    setAttempted(false);
+
     setDismissed('');
   };
   const choose = (option: MentionOption) => {
@@ -139,7 +218,7 @@ export default function QuickCapture({
     setText(next);
     setCaret(position);
     setDismissed('');
-    setAttempted(false);
+
     requestAnimationFrame(() => {
       input.current?.focus();
       input.current?.setSelectionRange(position, position);
@@ -152,6 +231,7 @@ export default function QuickCapture({
       .sort((a, b) => b.start - a.start))
       next = next.slice(0, m.start) + next.slice(m.end);
     if (kind === 'project') setContextProject(null);
+    if (kind === 'space') setContextSpace(null);
     edit(next, next.length);
     requestAnimationFrame(() => input.current?.focus());
   };
@@ -167,14 +247,17 @@ export default function QuickCapture({
     });
   };
   const save = async () => {
-    setAttempted(true);
-    if (
-      (sales ? sales.errors : parsed.errors).length ||
-      submitting.current ||
-      busy ||
-      !ready
-    )
-      return;
+    if (entry.errors.length || submitting.current || busy || !ready) return;
+    if (entry.kind === 'meeting') {
+      const date = new Date(`${entry.meetingDate}T${entry.meetingTime}:00`);
+      if (
+        !Number.isFinite(date.getTime()) ||
+        localDay(date) !== entry.meetingDate ||
+        `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` !==
+          entry.meetingTime
+      )
+        return;
+    }
     submitting.current = true;
     setSaving(true);
     const command = sales
@@ -183,26 +266,64 @@ export default function QuickCapture({
           captureText: text,
           captureDay: localDay(new Date()),
         }
-      : {
-          type: 'quick-create',
-          title: parsed.title,
-          spaceId: parsed.spaceId || '',
-          projectId: parsed.projectId || '',
-          due: parsed.due,
-          captureText: text,
-        };
+      : entry.kind !== 'task'
+        ? {
+            type: 'capture-entry',
+            kind: entry.kind,
+            captureText: text,
+            captureDay: localDay(new Date()),
+            contextProject,
+            contextSpace,
+            pins: pins.filter((p) => p.kind !== 'date'),
+            targetType: target?.type || '',
+            targetId: target?.id || '',
+            meetingDate,
+            meetingTime,
+            meetingOffset:
+              entry.kind === 'meeting'
+                ? new Date(
+                    `${entry.meetingDate}T${entry.meetingTime}:00`,
+                  ).getTimezoneOffset()
+                : null,
+            ...(entry.kind === 'deadline'
+              ? entry.taskId
+                ? {
+                    revision: data.tasks.find((t) => t.id === entry.taskId)
+                      ?.revision,
+                  }
+                : {
+                    previous: data.projects.find(
+                      (p) => p.id === entry.projectId,
+                    )?.due,
+                  }
+              : {}),
+          }
+        : {
+            type: 'quick-create',
+            title: entry.title,
+            spaceId: entry.spaceId || '',
+            projectId: parsed.projectId || '',
+            due: parsed.due,
+            captureText: text,
+          };
     const fingerprint = JSON.stringify(command);
     if (request.current?.fingerprint !== fingerprint)
       request.current = { fingerprint, id: crypto.randomUUID() };
     const id = request.current.id;
     try {
       if (await act({ ...command, captureId: id })) {
-        onCreated(id, sales?.nextStep || parsed.title);
+        setSavedId(id);
+        onCreated(id, entry.title, entry.kind);
+        setTarget(null);
+        setMeetingDate('');
+        setMeetingTime('');
+        setKind('auto');
         setText('');
         setPins([]);
         setCaret(0);
         setContextProject(projectId || null);
-        setAttempted(false);
+        setContextSpace(spaceId || null);
+
         request.current = null;
       }
     } finally {
@@ -215,7 +336,7 @@ export default function QuickCapture({
   return (
     <form
       className="quick-capture"
-      aria-label="Quick task capture"
+      aria-label="Capture a note, task, meeting, or deadline"
       onSubmit={(e) => {
         e.preventDefault();
         void save();
@@ -224,7 +345,7 @@ export default function QuickCapture({
       <header>
         <span>
           <span className="capture-pulse" />
-          {sales ? 'SALES CONVERSATION' : 'NEW TASK'}
+          {text.trim() ? entry.kind.toUpperCase() : 'CAPTURE ANYTHING'}
         </span>
         <Button
           size="icon"
@@ -236,6 +357,24 @@ export default function QuickCapture({
           <X size={16} />
         </Button>
       </header>
+      <fieldset className="capture-kind-picker" aria-label="Entry type">
+        {(['auto', 'note', 'task', 'meeting', 'deadline'] as const).map(
+          (value) => (
+            <button
+              type="button"
+              key={value}
+              aria-pressed={kind === value}
+              onClick={() => {
+                setKind(value);
+              }}
+            >
+              {value === 'auto'
+                ? 'Recognize'
+                : value[0].toUpperCase() + value.slice(1)}
+            </button>
+          ),
+        )}
+      </fieldset>
       <Command
         shouldFilter={false}
         loop
@@ -256,8 +395,8 @@ export default function QuickCapture({
           disabled={!ready || saving}
           maxLength={2000}
           autoComplete="off"
-          placeholder={`Book a meeting with @${data.spaces[0]?.name || 'client'} @tomorrow`}
-          aria-label="Task sentence"
+          placeholder="Jot a note, a meeting, or what needs to happen…"
+          aria-label="Capture sentence"
           aria-describedby={helpId}
           aria-expanded={menuOpen}
           onKeyDown={(e) => {
@@ -348,6 +487,76 @@ export default function QuickCapture({
           </CommandList>
         )}
       </Command>
+      {['note', 'meeting', 'deadline'].includes(entry.kind) && text.trim() && (
+        <div className="entry-routing">
+          <div className="entry-route-copy">
+            <span>Will save to</span>
+            <strong>{captureDestination(entry, data)}</strong>
+          </div>
+          <Select
+            value={target ? target.type + ':' + target.id : 'auto'}
+            onValueChange={(value) => {
+              if (!value || value === 'auto') setTarget(null);
+              else {
+                const colon = value.indexOf(':');
+                setTarget({
+                  type: value.slice(0, colon) as EntryTarget['type'],
+                  id: value.slice(colon + 1),
+                });
+              }
+            }}
+          >
+            <SelectTrigger aria-label="Capture destination">
+              <SelectValue>
+                {target ? 'Change destination' : 'Choose destination'}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">From the sentence</SelectItem>
+              {entry.kind !== 'deadline' &&
+                data.spaces.map((s) => (
+                  <SelectItem key={s.id} value={'space:' + s.id}>
+                    {s.name} · Client
+                  </SelectItem>
+                ))}
+              {data.projects.map((p) => (
+                <SelectItem key={p.id} value={'project:' + p.id}>
+                  {p.name} · Project
+                </SelectItem>
+              ))}
+              {entry.kind !== 'meeting' &&
+                data.tasks.map((t) => (
+                  <SelectItem key={t.id} value={'task:' + t.id}>
+                    {t.title} · Task
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {entry.kind === 'meeting' && (
+        <div className="entry-meeting-fields">
+          <label htmlFor={helpId + '-date'}>
+            Meeting date
+            <Input
+              id={helpId + '-date'}
+              type="date"
+              value={meetingDate || entry.meetingDate}
+              onChange={(e) => setMeetingDate(e.target.value)}
+            />
+          </label>
+          <label htmlFor={helpId + '-time'}>
+            Time
+            <Input
+              id={helpId + '-time'}
+              type="time"
+              value={meetingTime || entry.meetingTime}
+              onChange={(e) => setMeetingTime(e.target.value)}
+            />
+          </label>
+          <span>Saved in the client’s meetings. No invitation is sent.</span>
+        </div>
+      )}
       {sales ? (
         <div className="sales-capture-preview">
           <div>
@@ -370,20 +579,20 @@ export default function QuickCapture({
             </small>
           </div>
         </div>
-      ) : (
+      ) : entry.kind === 'task' ? (
         <div className="capture-context" aria-label="Resolved task connections">
           <span className="capture-chip capture-assignee">
             <UserRound size={13} />
             {member?.name || 'You'}
             <small>you</small>
           </span>
-          {parsed.space && (
+          {selectedSpace && (
             <span
               className="capture-chip"
-              style={{ '--chip-color': parsed.space.color } as CSSProperties}
+              style={{ '--chip-color': selectedSpace.color } as CSSProperties}
             >
               <BriefcaseBusiness size={13} />
-              {parsed.space.name}
+              {selectedSpace.name}
               {!parsed.project ||
               parsed.mentions.some((m) => m.kind === 'space') ? (
                 <button
@@ -425,10 +634,10 @@ export default function QuickCapture({
             </span>
           )}
         </div>
-      )}
-      {attempted && (sales ? sales.errors : parsed.errors).length > 0 && (
+      ) : null}
+      {text.trim() && entry.errors.length > 0 && (
         <p className="capture-error" role="alert">
-          {(sales ? sales.errors : parsed.errors)[0]}
+          {entry.errors[0]}
         </p>
       )}
       {error && (
@@ -463,10 +672,31 @@ export default function QuickCapture({
           ) : (
             <ArrowUp size={17} />
           )}
-          {sales ? 'Save conversation' : 'Add task'}
+          {sales
+            ? 'Save conversation'
+            : entry.kind === 'task'
+              ? 'Add task'
+              : entry.kind === 'deadline'
+                ? 'Set deadline'
+                : entry.kind === 'meeting'
+                  ? 'Save meeting'
+                  : 'Save note'}
           <CornerDownLeft size={12} />
         </Button>
       </footer>
+      {savedEntry && (
+        <output className="entry-saved">
+          <span>
+            <strong>Saved · {captureDestination(savedEntry, data)}</strong>
+            <small>{savedEntry.title}</small>
+          </span>
+          {onOpenEntry && (
+            <button type="button" onClick={() => onOpenEntry(savedEntry)}>
+              Open <ArrowUp size={14} />
+            </button>
+          )}
+        </output>
+      )}
     </form>
   );
 }

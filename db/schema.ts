@@ -325,3 +325,27 @@ export const prospectEvents = sqliteTable(
     index('events_by_prospect').on(t.org, t.prospectId),
   ],
 );
+
+export const captureEntries = sqliteTable(
+  'captureEntries',
+  {
+    ...identity(),
+    kind: text('kind').notNull(),
+    sourceText: text('sourceText').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull(),
+    targetType: text('targetType').notNull(),
+    targetId: text('targetId').notNull(),
+    spaceId: text('spaceId'),
+    projectId: text('projectId'),
+    taskId: text('taskId'),
+    actor: text('actor').notNull(),
+    createdAt: text('createdAt').notNull(),
+    fingerprint: text('fingerprint').notNull().default(''),
+    lastMutation: text('lastMutation').notNull().default(''),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    index('captures_by_actor').on(t.org, t.actor, t.createdAt),
+  ],
+);

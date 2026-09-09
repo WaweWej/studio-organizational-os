@@ -33,6 +33,7 @@ import {
   Target,
   X,
 } from 'lucide-react';
+import { ConnectedNotes } from './working-desk';
 import { RelatedResources } from './resource-library';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -736,6 +737,9 @@ export default function ClientFocus({
         </>
       )}
 
+      {tab === 'overview' && (
+        <ConnectedNotes data={data} target={{ type: 'space', id: space.id }} />
+      )}
       {tab === 'work' && (
         <div className="cf-tab-body">
           <PanelHeading

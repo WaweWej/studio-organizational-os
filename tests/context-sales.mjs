@@ -337,6 +337,7 @@ try {
             `DELETE FROM ${table} WHERE org='local_seedy' AND taskId='${id}';`,
         ),
         `DELETE FROM tasks WHERE org='local_seedy' AND id='${id}';`,
+        `DELETE FROM captureEntries WHERE org='local_seedy' AND id='${id}';`,
         `DELETE FROM prospectEvents WHERE org='local_seedy' AND id='${id}';`,
       ]),
       ...[...prospectIds].flatMap((id) => [
