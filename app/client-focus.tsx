@@ -74,6 +74,7 @@ import type { Meeting, Project, Space, Task, Workspace } from '@/lib/model';
 
 type Action = (command: Record<string, unknown>) => Promise<boolean>;
 type Props = {
+  initialMeetingId?: string | null;
   space: Space;
   data: Workspace;
   busy: boolean;
@@ -237,6 +238,7 @@ function Stage({ task }: { task: Task }) {
 }
 
 export default function ClientFocus({
+  initialMeetingId = null,
   space,
   data,
   busy,
@@ -257,7 +259,7 @@ export default function ClientFocus({
   const [discardMeeting, setDiscardMeeting] = useState(false);
   const [editBrand, setEditBrand] = useState(false);
   const [newMeeting, setNewMeeting] = useState(false);
-  const [meetingId, setMeetingId] = useState<string | null>(null);
+  const [meetingId, setMeetingId] = useState<string | null>(initialMeetingId);
   const [newTask, setNewTask] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const [deadline, setDeadline] = useState<Deadline | null>(null);
@@ -273,8 +275,7 @@ export default function ClientFocus({
   const upcoming = meetings
     .filter((m) => m.status === 'Planned')
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  const next =
-    upcoming.find((m) => Date.parse(m.startsAt) >= now) || upcoming.at(-1);
+  const next = upcoming.find((m) => Date.parse(m.startsAt) >= now);
   const previous = meetings.find((m) => m.status === 'Completed');
   const selectedMeeting = meetings.find((m) => m.id === meetingId);
   const deadlines = [...open]

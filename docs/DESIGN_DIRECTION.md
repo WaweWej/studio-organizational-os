@@ -1,0 +1,78 @@
+# Studio: an organization that keeps its context
+
+## Product thesis
+
+Studio should reduce the effort between an intention and useful work. A person arrives with “get me ready for this meeting”, “what needs me?”, or “finish the launch video”. The workspace assembles the relevant records, offers a clear next action, and preserves the outcome in the same connected records.
+
+The previous interface put every module in the navigation and asked people to assemble context themselves. Adding a chat panel to that structure would retain the underlying work. This redesign changes the entry points, the reading experience, and the path back into action.
+
+## The daily loop
+
+1. **Arrive.** Today presents work already in progress, review requests, recorded blockers, and the next meeting. It does not invent priorities or hide the board.
+2. **Understand.** Open a contextual brief without leaving the current workspace. Each claim has an identifiable task, meeting, project, or client record behind it.
+3. **Decide.** A small number of concrete actions appears next to the context: review work, open notes, continue a task, or capture a follow-up.
+4. **Act.** Existing task, review, meeting, and resource commands remain authoritative. Search and interpretation lead to those same interactions.
+5. **Remember.** Notes, decisions, links, review versions, and activity remain attached to their canonical records. The next brief reads those updated records.
+
+## Five stable places
+
+| Place   | The question it answers                              | Secondary views                                                 |
+| ------- | ---------------------------------------------------- | --------------------------------------------------------------- |
+| Today   | What needs me, and where do I continue?              | Brief, my board, team board                                     |
+| Spaces  | Who are we doing this for, and what matters to them? | Branded client home, meetings, work, references, sales pipeline |
+| Work    | What are we delivering together?                     | Projects, shared calendar, project board                        |
+| Library | Where is the thing I need?                           | Assets, templates, custom tools, vault                          |
+| Systems | How does this organization operate?                  | Process records, connection coverage                            |
+
+People and internal documents remain accessible through Workspace. Existing direct URLs continue to work. These places are reliable orientation points; they are not required steps before every action.
+
+## The shared interaction language
+
+- **Express an intention:** the command surface supports finding records, opening a client brief, reviewing work, and handing a sentence to structured task capture. Enter still starts quick capture on the daily surface; Cmd/Ctrl K opens the shared command surface.
+- **Read before editing:** task details initially show the description, deadline, ownership, connected context, and notes. The full metadata form is disclosed when needed.
+- **Stay in context:** briefs and tasks open beside the current place. Source actions open the original record. A meeting brief enters the existing meeting workspace, so there is one set of notes and decisions.
+- **Recognize the client:** editorial client imagery, typography, and brand color remain expressive within a consistent shell. System chrome stays restrained.
+- **Keep the first surface finite:** a few attention items and ongoing tasks; remaining items have an explicit route to the board, calendar, or full list.
+- **Make missing context useful:** no meeting, no agenda, no recorded activity, and no connector are distinct states. Empty states explain the available next action without fabricating content.
+
+## Meeting preparation: the reference interaction
+
+From Today or “prepare Nord”, open a client brief. It brings together the upcoming agenda, the client's stated wants and needs, decisions recorded at the last completed meeting, actual activity since that meeting, active project progress, outstanding reviews, blockers, and linked resources. Completed/cancelled meetings never masquerade as upcoming. Old review versions never become current review requests. Standalone client tasks belong in the brief alongside project tasks.
+
+“Open meeting notes” opens that exact meeting's existing workspace. Reviewing a deliverable opens that task's Work & review tab. Opening a source never creates a duplicate record.
+
+## Intelligence architecture
+
+The present implementation assembles briefs deterministically from saved records. This is a working context layer, not a connected language model. Suggested attention is explicitly derived from record state; it is not an autonomous priority decision. There are no invented campaign results or external health signals.
+
+A later model should consume a permission-filtered context bundle containing record IDs, revisions, timestamps, and source coverage. Its output should distinguish grounded observations, uncertain interpretations, and proposed actions. Actions must use the same server-validated command boundary as the UI. A stale revision requires refreshed context; it must not silently overwrite newer work.
+
+External instructions found in documents and tools are data, not authority. Secrets are excluded from model context. External sending, publishing, and financial actions need an explicit configured authority and a visible result. The model must never claim an integration ran solely because a command was proposed. A history of executed commands and source versions makes corrections possible.
+
+Model interpretation belongs at entry points and between connected records, rather than becoming an extra destination that users must continually visit. Deterministic direct manipulation, keyboard capture, and search remain available.
+
+## Visual system
+
+Warm neutral canvas, legible ink, a narrow five-place rail, generous spacing, and quiet translucent surfaces. Accent color identifies actions and selection; client color identifies context. Depth distinguishes the persistent workspace from temporary context. Ordinary labels and task titles remain high contrast. Motion is restrained and respects reduced-motion preferences. Mobile uses the existing accessible navigation drawer and stacks the brief without dropping actions.
+
+## Scope and remaining foundations
+
+This iteration implements the shell, daily brief, client preparation flow, action/search surface, unified library, read-first task details, and truthful connection coverage. It preserves the underlying task/review/calendar/resource workflows and adds a schema migration for prospects, conversation history, and canonical task links.
+
+The workspace still has one authenticated owner and sample colleagues. Real team permissions/invitations, production connectors, a model provider, background ingestion, reliable delivery jobs, and a live automation canvas remain separate engineering milestones. Process records currently document and connect resources; they do not monitor third-party execution. Client-facing access requires scoped sharing before it can ship.
+
+## Acceptance checks
+
+- A current review appears only for its assigned reviewer and current task version; opening it reaches the existing approval workflow.
+- A client brief includes both direct client tasks and project tasks, with no cross-client leakage.
+- Date boundaries, cancelled meetings, empty agendas, missing deadlines, and completed projects produce accurate states.
+- A sentence passed from the command surface reaches the existing capture parser unchanged and creates a canonical task through the existing API.
+- Library tools remain reachable through old URLs and the new Library tabs.
+- Existing client, project, task, calendar, and tool links keep working after navigation changes.
+- Loading and connector coverage never imply records or external signals have already arrived.
+
+## Sales conversations as a distinct intention
+
+“Sales meeting with "Acme", next step: calculate lead price” is interpreted as a prospect interaction with a linked task. Capture previews both outcomes. The server parses the sentence again, validates the date and next step, and saves prospect lookup/creation, conversation, task, and activity atomically. Case and whitespace normalized exact names reuse an existing prospect. Ambiguous fuzzy matching is intentionally avoided. Retrying the same capture does not duplicate effects.
+
+Prospects have their own pipeline stages and history; active clients retain their richer brand spaces. Sales stage changes do not alter task progress, and completing a next step does not advance a prospect. The next action is assigned to the authenticated actor, visible on their board, and linked back to the sales history. A won prospect does not automatically become an active client yet.

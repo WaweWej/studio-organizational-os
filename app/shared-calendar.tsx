@@ -489,6 +489,7 @@ export default function SharedCalendar({
             options={[
               { id: 'all', name: 'All spaces' },
               { id: 'internal', name: 'Internal & inbox' },
+              { id: 'prospects', name: 'Sales prospects' },
               ...data.spaces.map((s) => ({ id: s.id, name: s.name })),
             ]}
           />

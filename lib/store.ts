@@ -1,3 +1,4 @@
+import { mutateSales } from './sales-store';
 import { mutateResource, upgradeResources } from './resource-store';
 import { mutateClient } from './client-store';
 import { env } from 'cloudflare:workers';
@@ -13,6 +14,8 @@ import {
 } from './validation';
 
 const collections = [
+  'prospects',
+  'prospectEvents',
   'members',
   'spaces',
   'projects',
@@ -124,7 +127,8 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
     (table, i) =>
       (out[table] = results[i].results.map((raw) => {
         const row = raw as Record<string, unknown>;
-        const { org, lastMutation, fileKey, ...record } = row;
+        const { org, lastMutation, fileKey, fingerprint, ...record } = row;
+        void fingerprint;
         void org;
         void lastMutation;
         void fileKey;
@@ -174,6 +178,10 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
   const type = textValue(input.type, 'Action', 40, true),
     now = new Date().toISOString(),
     nonce = crypto.randomUUID();
+  if (type.startsWith('sales-')) {
+    await mutateSales(c, input);
+    return;
+  }
   if (
     type.startsWith('resource-') ||
     type === 'folder-create' ||

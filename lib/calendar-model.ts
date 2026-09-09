@@ -7,6 +7,7 @@ export type DeadlineEntry = {
   id: string;
   title: string;
   due: string;
+  prospectId?: string | null;
   projectId: string | null;
   spaceId: string | null;
   client: string;
@@ -78,6 +79,7 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
   });
   for (const task of data.tasks) {
     const project = task.projectId ? projects.get(task.projectId) : undefined;
+    const prospect = data.prospects.find((p) => p.id === task.prospectId);
     const spaceId = taskSpaceId(data, task);
     const space = spaceId ? spaces.get(spaceId) : undefined;
     entries.push({
@@ -87,8 +89,15 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
       title: task.title,
       due: task.due,
       projectId: task.projectId,
+      prospectId: task.prospectId || null,
       spaceId,
-      client: space?.name || (project ? 'Internal' : 'Inbox'),
+      client:
+        space?.name ||
+        (prospect
+          ? prospect.name + ' · Prospect'
+          : project
+            ? 'Internal'
+            : 'Inbox'),
       color: space?.color || '#64718a',
       ownerId: task.assignee,
       complete: task.stage === 'Done',
@@ -115,8 +124,10 @@ export function filterDeadlines(
       (filters.kind === 'all' || e.kind === filters.kind) &&
       (filters.space === 'all' ||
         (filters.space === 'internal'
-          ? !e.spaceId
-          : e.spaceId === filters.space)) &&
+          ? !e.spaceId && !e.prospectId
+          : filters.space === 'prospects'
+            ? !!e.prospectId
+            : e.spaceId === filters.space)) &&
       (filters.project === 'all' || e.projectId === filters.project) &&
       (filters.completed || !e.complete),
   );

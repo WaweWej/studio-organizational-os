@@ -1,3 +1,4 @@
+import type { Prospect, ProspectEvent } from './sales-model';
 import type {
   Resource,
   ResourceLink,
@@ -55,6 +56,7 @@ export type Project = {
   due: string;
 };
 export type Task = {
+  prospectId?: string | null;
   spaceId: string | null;
   id: string;
   title: string;
@@ -114,6 +116,8 @@ export type Document = {
   body: string;
 };
 export type Workspace = {
+  prospects: Prospect[];
+  prospectEvents: ProspectEvent[];
   resources: Resource[];
   resourceLinks: ResourceLink[];
   folders: Folder[];
@@ -273,6 +277,8 @@ export function initialWorkspace(): Workspace {
     }),
   );
   return {
+    prospects: [],
+    prospectEvents: [],
     resources: [],
     resourceLinks: [],
     folders: [],

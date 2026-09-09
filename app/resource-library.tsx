@@ -373,7 +373,9 @@ export default function ResourceLibrary({
   mode?: 'library' | 'tools';
 }) {
   const { data, add, ready, busy, act, refresh } = useLibrary();
-  const [tab, setTab] = useState<ResourceKind>('asset'),
+  const [tab, setTab] = useState<ResourceKind>(
+      mode === 'tools' ? 'tool' : 'asset',
+    ),
     [query, setQuery] = useState(''),
     [folder, setFolder] = useState<string | null>(null),
     [category, setCategory] = useState('all'),
@@ -385,7 +387,7 @@ export default function ResourceLibrary({
     [folderDialog, setFolderDialog] = useState(false),
     [folderName, setFolderName] = useState('');
   const input = useRef<HTMLInputElement>(null);
-  const kind = mode === 'tools' ? 'tool' : tab;
+  const kind = tab;
   const scoped =
     space === 'all'
       ? null
@@ -615,13 +617,13 @@ export default function ResourceLibrary({
       <header className="library-heading">
         <div>
           <p className="eyebrow">
-            {mode === 'tools' ? 'THE STUDIO TOOLBOX' : 'THE SHARED COLLECTION'}
+            {kind === 'tool' ? 'THE STUDIO TOOLBOX' : 'THE SHARED COLLECTION'}
           </p>
           <h1>
-            {mode === 'tools' ? 'Made to make things.' : 'Everything, at hand.'}
+            {kind === 'tool' ? 'Made to make things.' : 'Everything, at hand.'}
           </h1>
           <p>
-            {mode === 'tools'
+            {kind === 'tool'
               ? 'Your custom tools and systems, connected to the work.'
               : 'The assets, starting points, and knowledge behind the work.'}
           </p>
@@ -674,7 +676,7 @@ export default function ResourceLibrary({
           </Button>
         </div>
       </header>
-      {mode === 'library' && (
+      {
         <Tabs
           value={tab}
           onValueChange={(v) => {
@@ -694,13 +696,17 @@ export default function ResourceLibrary({
               <BookOpen size={15} />
               Templates
             </TabsTrigger>
+            <TabsTrigger value="tool">
+              <Blocks size={15} />
+              Tools
+            </TabsTrigger>
             <TabsTrigger value="vault">
               <LockKeyhole size={15} />
               Vault
             </TabsTrigger>
           </TabsList>
         </Tabs>
-      )}
+      }
       <input
         ref={input}
         type="file"

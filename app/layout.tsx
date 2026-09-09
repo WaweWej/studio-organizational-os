@@ -5,6 +5,8 @@ import './client-focus.css';
 import './editorial.css';
 import './shared-calendar.css';
 import './work-board.css';
+import './resource-library.css';
+import './organization-os.css';
 
 export const metadata: Metadata = {
   title: 'Studio — Your organizational workspace',
@@ -23,5 +25,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-import './resource-library.css';

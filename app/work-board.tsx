@@ -286,6 +286,7 @@ function BoardCard({
   move: (t: Task, stage: Stage) => void;
   drag: (t: Task | null) => void;
 }) {
+  const prospect = data.prospects.find((p) => p.id === task.prospectId);
   const project = data.projects.find((p) => p.id === task.projectId),
     space = data.spaces.find((s) => s.id === taskSpaceId(data, task)),
     member = data.members.find((m) => m.id === task.assignee),
@@ -306,11 +307,18 @@ function BoardCard({
       <button className="work-card-main" onClick={() => openTask(task.id)}>
         <span className="work-card-client">
           <span />
-          {space?.name || (project ? 'Studio' : 'Personal')}
+          {space?.name || prospect?.name || (project ? 'Studio' : 'Personal')}
           <GripVertical size={14} />
         </span>
         <h3>{task.title}</h3>
-        <p>{project?.name || (space ? 'Client task' : 'Personal task')}</p>
+        <p>
+          {project?.name ||
+            (prospect
+              ? 'Prospect · ' + prospect.stage
+              : space
+                ? 'Client task'
+                : 'Personal task')}
+        </p>
         {task.blocked && (
           <span className="work-card-blocked">
             <Flag size={12} />

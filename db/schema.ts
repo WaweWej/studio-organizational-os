@@ -4,6 +4,7 @@ import {
   integer,
   primaryKey,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 const identity = () => ({
   org: text('org').notNull(),
@@ -67,6 +68,7 @@ export const tasks = sqliteTable(
   {
     ...identity(),
     title: text('title').notNull(),
+    prospectId: text('prospectId'),
     projectId: text('projectId'),
     spaceId: text('spaceId'),
     assignee: text('assignee').notNull(),
@@ -285,4 +287,41 @@ export const vaultEntries = sqliteTable(
   'vaultEntries',
   { ...identity(), sealed: text('sealed').notNull() },
   (t) => [primaryKey({ columns: [t.org, t.id] })],
+);
+
+export const prospects = sqliteTable(
+  'prospects',
+  {
+    ...identity(),
+    name: text('name').notNull(),
+    nameKey: text('nameKey').notNull(),
+    owner: text('owner').notNull(),
+    stage: text('stage').notNull(),
+    revision: integer('revision').notNull().default(0),
+    createdAt: text('createdAt').notNull(),
+    updatedAt: text('updatedAt').notNull(),
+    lastMutation: text('lastMutation').notNull().default(''),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    uniqueIndex('prospects_by_name').on(t.org, t.nameKey),
+  ],
+);
+export const prospectEvents = sqliteTable(
+  'prospectEvents',
+  {
+    ...identity(),
+    prospectId: text('prospectId').notNull(),
+    taskId: text('taskId'),
+    body: text('body').notNull(),
+    kind: text('kind').notNull(),
+    actor: text('actor').notNull(),
+    createdAt: text('createdAt').notNull(),
+    fingerprint: text('fingerprint').notNull().default(''),
+    lastMutation: text('lastMutation').notNull().default(''),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    index('events_by_prospect').on(t.org, t.prospectId),
+  ],
 );

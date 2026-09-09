@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
 import type { Workspace } from '@/lib/model';
+import { parseSalesCapture } from '@/lib/sales-model';
+import { localDay } from '@/lib/workspace-brief';
 import {
   parseCapture,
   activeMention,
@@ -73,8 +75,12 @@ export default function QuickCapture({
     submitting = useRef(false),
     request = useRef<{ fingerprint: string; id: string } | null>(null),
     helpId = useId();
+  const sales = parseSalesCapture(text);
+  const existingProspect = sales
+    ? data.prospects.find((p) => p.nameKey === sales.nameKey)
+    : undefined;
   const parsed = parseCapture(text, data, { projectId: contextProject, pins }),
-    active = activeMention(text, caret, parsed.mentions),
+    active = sales ? null : activeMention(text, caret, parsed.mentions),
     queryKey = active ? `${active.start}:${active.query}` : '',
     suggestions =
       active && dismissed !== queryKey
@@ -162,24 +168,36 @@ export default function QuickCapture({
   };
   const save = async () => {
     setAttempted(true);
-    if (parsed.errors.length || submitting.current || busy || !ready) return;
+    if (
+      (sales ? sales.errors : parsed.errors).length ||
+      submitting.current ||
+      busy ||
+      !ready
+    )
+      return;
     submitting.current = true;
     setSaving(true);
-    const command = {
-      type: 'quick-create',
-      title: parsed.title,
-      spaceId: parsed.spaceId || '',
-      projectId: parsed.projectId || '',
-      due: parsed.due,
-      captureText: text,
-    };
+    const command = sales
+      ? {
+          type: 'sales-capture',
+          captureText: text,
+          captureDay: localDay(new Date()),
+        }
+      : {
+          type: 'quick-create',
+          title: parsed.title,
+          spaceId: parsed.spaceId || '',
+          projectId: parsed.projectId || '',
+          due: parsed.due,
+          captureText: text,
+        };
     const fingerprint = JSON.stringify(command);
     if (request.current?.fingerprint !== fingerprint)
       request.current = { fingerprint, id: crypto.randomUUID() };
     const id = request.current.id;
     try {
       if (await act({ ...command, captureId: id })) {
-        onCreated(id, parsed.title);
+        onCreated(id, sales?.nextStep || parsed.title);
         setText('');
         setPins([]);
         setCaret(0);
@@ -206,7 +224,7 @@ export default function QuickCapture({
       <header>
         <span>
           <span className="capture-pulse" />
-          NEW TASK
+          {sales ? 'SALES CONVERSATION' : 'NEW TASK'}
         </span>
         <Button
           size="icon"
@@ -330,63 +348,87 @@ export default function QuickCapture({
           </CommandList>
         )}
       </Command>
-      <div className="capture-context" aria-label="Resolved task connections">
-        <span className="capture-chip capture-assignee">
-          <UserRound size={13} />
-          {member?.name || 'You'}
-          <small>you</small>
-        </span>
-        {parsed.space && (
-          <span
-            className="capture-chip"
-            style={{ '--chip-color': parsed.space.color } as CSSProperties}
-          >
-            <BriefcaseBusiness size={13} />
-            {parsed.space.name}
-            {!parsed.project ||
-            parsed.mentions.some((m) => m.kind === 'space') ? (
+      {sales ? (
+        <div className="sales-capture-preview">
+          <div>
+            <span>Prospect</span>
+            <strong>{sales.name || 'Name the prospect'}</strong>
+            <small>
+              {existingProspect
+                ? 'Existing prospect · ' + existingProspect.stage
+                : 'New prospect · Discovery'}
+            </small>
+          </div>
+          <ArrowUp size={17} />
+          <div>
+            <span>Next action · assigned to you</span>
+            <strong>{sales.nextStep || 'Describe the next step'}</strong>
+            <small>
+              {sales.due
+                ? displayCaptureDate(sales.due)
+                : 'Connected to this prospect and your board'}
+            </small>
+          </div>
+        </div>
+      ) : (
+        <div className="capture-context" aria-label="Resolved task connections">
+          <span className="capture-chip capture-assignee">
+            <UserRound size={13} />
+            {member?.name || 'You'}
+            <small>you</small>
+          </span>
+          {parsed.space && (
+            <span
+              className="capture-chip"
+              style={{ '--chip-color': parsed.space.color } as CSSProperties}
+            >
+              <BriefcaseBusiness size={13} />
+              {parsed.space.name}
+              {!parsed.project ||
+              parsed.mentions.some((m) => m.kind === 'space') ? (
+                <button
+                  type="button"
+                  onClick={() => remove('space')}
+                  aria-label="Remove client"
+                >
+                  <X size={12} />
+                </button>
+              ) : (
+                <small>client</small>
+              )}
+            </span>
+          )}
+          {parsed.project && (
+            <span className="capture-chip">
+              <Layers size={13} />
+              {parsed.project.name}
               <button
                 type="button"
-                onClick={() => remove('space')}
-                aria-label="Remove client"
+                onClick={() => remove('project')}
+                aria-label="Remove project"
               >
                 <X size={12} />
               </button>
-            ) : (
-              <small>client</small>
-            )}
-          </span>
-        )}
-        {parsed.project && (
-          <span className="capture-chip">
-            <Layers size={13} />
-            {parsed.project.name}
-            <button
-              type="button"
-              onClick={() => remove('project')}
-              aria-label="Remove project"
-            >
-              <X size={12} />
-            </button>
-          </span>
-        )}
-        {parsed.due && (
-          <span className="capture-chip capture-date">
-            <CalendarDays size={13} />
-            {displayCaptureDate(parsed.due)}
-            <button
-              type="button"
-              onClick={() => remove('date')}
-              aria-label="Remove deadline"
-            >
-              <X size={12} />
-            </button>
-          </span>
-        )}
-      </div>
-      {attempted && parsed.errors.length > 0 && (
+            </span>
+          )}
+          {parsed.due && (
+            <span className="capture-chip capture-date">
+              <CalendarDays size={13} />
+              {displayCaptureDate(parsed.due)}
+              <button
+                type="button"
+                onClick={() => remove('date')}
+                aria-label="Remove deadline"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+      {attempted && (sales ? sales.errors : parsed.errors).length > 0 && (
         <p className="capture-error" role="alert">
-          {parsed.errors[0]}
+          {(sales ? sales.errors : parsed.errors)[0]}
         </p>
       )}
       {error && (
@@ -397,6 +439,7 @@ export default function QuickCapture({
       <footer>
         <div>
           <button
+            hidden={!!sales}
             className="capture-mention-button"
             type="button"
             onClick={mention}
@@ -420,7 +463,7 @@ export default function QuickCapture({
           ) : (
             <ArrowUp size={17} />
           )}
-          Add task
+          {sales ? 'Save conversation' : 'Add task'}
           <CornerDownLeft size={12} />
         </Button>
       </footer>

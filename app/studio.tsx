@@ -1,6 +1,16 @@
 'use client';
 import { taskSpaceId } from '@/lib/task-context';
 import ClientFocus from './client-focus';
+import SalesPipeline from './sales-pipeline';
+import Today, { readableDate } from './today';
+import ContextBrief from './context-brief';
+import IntentPalette from './intent-palette';
+import ConnectionCoverage from './connection-coverage';
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/components/ui/collapsible';
 import WorkBoard from './work-board';
 import QuickCapture, { type CaptureDraft } from './quick-capture';
 import ClientDirectory from './client-directory';
@@ -9,7 +19,6 @@ import ResourceLibrary, {
   ResourceProvider,
   RelatedResources,
   BlueprintRegistry,
-  ResourceCommands,
 } from './resource-library';
 import {
   useState,
@@ -22,29 +31,17 @@ import {
 import {
   Sun,
   BookOpen,
-  CalendarDays,
   Layers,
   BriefcaseBusiness,
   Workflow,
-  Blocks,
-  ChartNoAxesCombined,
-  Building2,
   Search,
   Bell,
   Plus,
   ChevronRight,
   ArrowUpRight,
   Check,
-  Circle,
-  CircleDot,
-  CircleCheck,
-  MessageSquare,
-  ArrowRight,
-  Clock3,
-  ExternalLink,
   FileText,
   Inbox,
-  Users,
   LoaderCircle,
 } from 'lucide-react';
 import {
@@ -54,7 +51,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -82,14 +78,6 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
-import {
-  CommandDialog,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-} from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -99,20 +87,30 @@ import {
   type Workspace,
   type Task,
   type Member,
-  type Stage,
 } from '@/lib/model';
 
 const navigation = [
-  { id: 'day', name: 'My day', icon: Sun },
-  { id: 'work', name: 'Work', icon: Layers },
-  { id: 'calendar', name: 'Calendar', icon: CalendarDays },
+  { id: 'day', name: 'Today', icon: Sun },
   { id: 'spaces', name: 'Spaces', icon: BriefcaseBusiness },
-  { id: 'blueprints', name: 'Blueprints', icon: Workflow },
+  { id: 'work', name: 'Work', icon: Layers },
   { id: 'library', name: 'Library', icon: BookOpen },
-  { id: 'tools', name: 'Tools', icon: Blocks },
-  { id: 'insights', name: 'Insights', icon: ChartNoAxesCombined },
-  { id: 'organization', name: 'Organization', icon: Building2 },
+  { id: 'blueprints', name: 'Systems', icon: Workflow },
 ];
+const pages = [
+  ...navigation.map((n) => n.id),
+  'calendar',
+  'tools',
+  'insights',
+  'organization',
+  'sales',
+];
+const parentPage = (page: string) =>
+  ({
+    sales: 'spaces',
+    calendar: 'work',
+    tools: 'library',
+    insights: 'blueprints',
+  })[page] || page;
 function Avatar({
   member,
   small = false,
@@ -161,6 +159,13 @@ function Picker({
 
 export default function Studio() {
   const captureDrafts = useRef(new Map<string, CaptureDraft>());
+  const [prospectId, setProspectId] = useState<string | null>(null);
+  const [dayView, setDayView] = useState('brief');
+  const [intentQuery, setIntentQuery] = useState('');
+  const [briefSpaceId, setBriefSpaceId] = useState<string | null>(null);
+  const [meetingOpenVersion, setMeetingOpenVersion] = useState(0);
+  const [meetingToOpen, setMeetingToOpen] = useState<string | null>(null);
+  const [captureKey, setCaptureKey] = useState(0);
   const [captureRequested, setCaptureRequested] = useState(0);
   const [taskFocus, setTaskFocus] = useState<'brief' | 'work' | undefined>(
     undefined,
@@ -205,20 +210,93 @@ export default function Studio() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
+        setIntentQuery('');
         setSearch(true);
       }
     };
     window.addEventListener('keydown', onKey);
     const params = new URLSearchParams(window.location.search);
-    if (navigation.some((n) => n.id === params.get('view')))
-      setPage(params.get('view')!);
+    if (pages.includes(params.get('view') || '')) setPage(params.get('view')!);
+    if (params.get('prospect')) {
+      setPage('sales');
+      setProspectId(params.get('prospect'));
+    }
     if (params.get('task')) setSelected(params.get('task'));
+    if (params.get('project')) {
+      setPage('work');
+      setProjectId(params.get('project'));
+    }
     if (params.get('space')) {
       setPage('spaces');
       setSpaceId(params.get('space'));
     }
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  useEffect(() => {
+    if (
+      !((page === 'day' && dayView === 'brief') || page === 'sales') ||
+      prospectId ||
+      !ready ||
+      search ||
+      create ||
+      selected ||
+      briefSpaceId ||
+      notices ||
+      documentId
+    )
+      return;
+    const key = (e: KeyboardEvent) => {
+      if (
+        e.key !== 'Enter' ||
+        e.defaultPrevented ||
+        e.isComposing ||
+        e.repeat ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        e.shiftKey
+      )
+        return;
+      if (
+        (e.target as HTMLElement | null)?.closest(
+          'input,textarea,select,button,a,[contenteditable="true"],[role="combobox"]',
+        ) ||
+        document.querySelector(
+          '[role="dialog"],[role="alertdialog"],[role="menu"]',
+        )
+      )
+        return;
+      e.preventDefault();
+      setCreate(true);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [
+    page,
+    dayView,
+    prospectId,
+    ready,
+    search,
+    create,
+    selected,
+    briefSpaceId,
+    notices,
+    documentId,
+  ]);
+  const openIntent = (query = '') => {
+    setIntentQuery(query);
+    setSearch(true);
+  };
+  const capture = (text?: string) => {
+    if (text)
+      captureDrafts.current.set(projectId || 'workspace', {
+        text,
+        pins: [],
+        contextProject: projectId,
+      });
+    setCaptureKey((v) => v + 1);
+    setCreate(true);
+  };
   const openTask = (id: string, focus?: 'brief' | 'work') => {
     setTaskFocus(focus);
     setSelected(id);
@@ -267,15 +345,26 @@ export default function Studio() {
     updateSpaceUrl(null);
     const url = new URL(window.location.href);
     url.searchParams.set('view', id);
+    url.searchParams.delete('project');
+    url.searchParams.delete('prospect');
     window.history.replaceState(null, '', url);
     setPage(id);
+    setProspectId(null);
+    setMeetingToOpen(null);
+    if (id === 'day') setDayView('brief');
     setSpaceId(null);
     setProjectId(null);
     closeTask();
     setError('');
   };
   const space = (id: string) => {
+    setMeetingToOpen(null);
     updateSpaceUrl(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'spaces');
+    url.searchParams.delete('project');
+    url.searchParams.delete('prospect');
+    window.history.replaceState(null, '', url);
     setPage('spaces');
     setSpaceId(id);
     setProjectId(null);
@@ -283,26 +372,41 @@ export default function Studio() {
   };
   const project = (id: string) => {
     updateSpaceUrl(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set('view', 'work');
+    url.searchParams.set('project', id);
+    url.searchParams.delete('prospect');
+    window.history.replaceState(null, '', url);
     setPage('work');
     setProjectId(id);
     setSpaceId(null);
     closeTask();
   };
+  const selectProspect = (id: string | null) => {
+    setProspectId(id);
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set('prospect', id);
+    else url.searchParams.delete('prospect');
+    window.history.replaceState(null, '', url);
+  };
+  const openProspect = (id: string) => {
+    navigate('sales');
+    selectProspect(id);
+  };
+  const openMeeting = (clientId: string, meetingId: string) => {
+    space(clientId);
+    setMeetingToOpen(meetingId);
+    setMeetingOpenVersion((v) => v + 1);
+  };
+  const openBoard = (mode = 'mine') => {
+    navigate('day');
+    setDayView('board');
+    setScope(mode);
+  };
   const currentTask = data.tasks.find((t) => t.id === selected),
     currentSpace = data.spaces.find((s) => s.id === spaceId),
     currentProject = data.projects.find((p) => p.id === projectId),
     doc = data.documents.find((d) => d.id === documentId);
-  const pending = data.tasks.filter(
-    (t) =>
-      t.stage === 'Review' &&
-      t.reviewer === data.currentMember &&
-      data.reviews.some(
-        (r) =>
-          r.taskId === t.id &&
-          r.version === t.version &&
-          r.decision === 'Pending',
-      ),
-  );
   const shown = data.tasks
     .filter(
       (t) =>
@@ -323,7 +427,14 @@ export default function Studio() {
       openTask={openTask}
       projectId={projectId}
       captureRequested={captureRequested}
-      enabled={!selected && !search && !notices && !create && !documentId}
+      enabled={
+        !selected &&
+        !search &&
+        !notices &&
+        !create &&
+        !documentId &&
+        !briefSpaceId
+      }
       drafts={captureDrafts.current}
     />
   );
@@ -336,60 +447,29 @@ export default function Studio() {
       act={act}
       refresh={refresh}
     >
-      <SidebarProvider style={{ '--sidebar-width': '218px' } as CSSProperties}>
+      <SidebarProvider
+        className="studio-os"
+        style={{ '--sidebar-width': '104px' } as CSSProperties}
+      >
         <Sidebar className="studio-sidebar">
           <SidebarHeader className="brand">
             <span className="brand-symbol">
               <Layers size={19} />
             </span>
             <strong>studio</strong>
-            <span className="edition">OS</span>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>WORKSPACE</SidebarGroupLabel>
               <SidebarMenu>
                 {navigation.map((n) => (
                   <SidebarMenuItem key={n.id}>
                     <SidebarMenuButton
-                      isActive={page === n.id}
+                      isActive={parentPage(page) === n.id}
                       onClick={() => navigate(n.id)}
                       className="nav-item"
                     >
                       <n.icon size={18} />
                       <span>{n.name}</span>
-                      {n.id === 'day' && (
-                        <span className="nav-count">
-                          {
-                            data.tasks.filter(
-                              (t) =>
-                                t.assignee === data.currentMember &&
-                                t.stage !== 'Done',
-                            ).length
-                          }
-                        </span>
-                      )}
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-            <SidebarGroup className="pinned-spaces">
-              <SidebarGroupLabel>YOUR SPACES</SidebarGroupLabel>
-              <SidebarMenu>
-                {data.spaces.slice(0, 3).map((s) => (
-                  <SidebarMenuItem key={s.id}>
-                    <SidebarMenuButton
-                      onClick={() => space(s.id)}
-                      className="nav-item"
-                    >
-                      <span
-                        className="space-initial"
-                        style={{ color: s.color, background: s.color + '18' }}
-                      >
-                        {s.name.slice(0, 1)}
-                      </span>
-                      <span>{s.name}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -397,37 +477,37 @@ export default function Studio() {
             </SidebarGroup>
           </SidebarContent>
           <SidebarFooter>
-            <div className="workspace-state">
-              <span className="status-dot" />
-              {ready ? 'Sample workspace' : 'Connecting…'}
-              <span>PRIVATE</span>
-            </div>
-            <div className="profile">
+            <button
+              className="rail-workspace"
+              onClick={() => navigate('organization')}
+              aria-label="Workspace, people and documents"
+            >
               <Avatar
                 member={data.members.find((m) => m.id === data.currentMember)}
               />
-              <div>
-                <strong>
-                  {data.members.find((m) => m.id === data.currentMember)?.name}
-                </strong>
-                <small>Workspace owner</small>
-              </div>
-            </div>
+              <span>Workspace</span>
+            </button>
           </SidebarFooter>
         </Sidebar>
         <div className="studio-main">
           <header className="topbar">
             <div className="crumb">
               <SidebarTrigger />
-              <span>Studio workspace</span>
+              <span>Studio</span>
               <ChevronRight size={14} />
-              <strong>{navigation.find((n) => n.id === page)?.name}</strong>
+              <strong>
+                {currentSpace?.name ||
+                  currentProject?.name ||
+                  (page === 'organization'
+                    ? 'Workspace'
+                    : navigation.find((n) => n.id === parentPage(page))?.name)}
+              </strong>
             </div>
             <div className="top-actions">
-              <button className="search-button" onClick={() => setSearch(true)}>
+              <button className="search-button" onClick={() => openIntent()}>
                 <Search size={16} />
-                <span>Search anything</span>
-                <kbd>⌘ K</kbd>
+                <span>Find or do anything</span>
+                <kbd>⌘ / Ctrl K</kbd>
               </button>
               <button
                 className="icon-button"
@@ -439,11 +519,112 @@ export default function Studio() {
                   <span className="notification-dot" />
                 )}
               </button>
-              <Avatar member={data.members[0]} small />
+              <span className="top-workspace-state">
+                {data.demo ? 'Sample workspace' : 'Private workspace'}
+              </span>
             </div>
           </header>
           <main className="workspace-content">
-            {!['spaces', 'calendar', 'library', 'tools'].includes(page) && (
+            <nav className="context-nav" aria-label="Workspace views">
+              {['spaces', 'sales'].includes(page) && !currentSpace && (
+                <>
+                  <button
+                    className={page === 'spaces' ? 'active' : ''}
+                    onClick={() => navigate('spaces')}
+                  >
+                    Client spaces
+                  </button>
+                  <button
+                    className={page === 'sales' ? 'active' : ''}
+                    onClick={() => navigate('sales')}
+                  >
+                    Sales pipeline
+                  </button>
+                </>
+              )}
+              {page === 'day' && (
+                <>
+                  <button
+                    className={dayView === 'brief' ? 'active' : ''}
+                    onClick={() => setDayView('brief')}
+                  >
+                    Brief
+                  </button>
+                  <button
+                    className={
+                      dayView === 'board' && scope === 'mine' ? 'active' : ''
+                    }
+                    onClick={() => {
+                      setDayView('board');
+                      setScope('mine');
+                    }}
+                  >
+                    My board
+                  </button>
+                  <button
+                    className={
+                      dayView === 'board' && scope === 'team' ? 'active' : ''
+                    }
+                    onClick={() => {
+                      setDayView('board');
+                      setScope('team');
+                    }}
+                  >
+                    Team board
+                  </button>
+                </>
+              )}
+              {['work', 'calendar'].includes(page) && (
+                <>
+                  <button
+                    className={page === 'work' ? 'active' : ''}
+                    onClick={() => navigate('work')}
+                  >
+                    Projects
+                  </button>
+                  <button
+                    className={page === 'calendar' ? 'active' : ''}
+                    onClick={() => navigate('calendar')}
+                  >
+                    Shared calendar
+                  </button>
+                  <button onClick={() => openBoard('team')}>Team board</button>
+                </>
+              )}
+              {['blueprints', 'insights'].includes(page) && (
+                <>
+                  <button
+                    className={page === 'blueprints' ? 'active' : ''}
+                    onClick={() => navigate('blueprints')}
+                  >
+                    Processes
+                  </button>
+                  <button
+                    className={page === 'insights' ? 'active' : ''}
+                    onClick={() => navigate('insights')}
+                  >
+                    Connection coverage
+                  </button>
+                </>
+              )}
+              {currentSpace && (
+                <button
+                  className="context-prepare"
+                  onClick={() => setBriefSpaceId(currentSpace.id)}
+                >
+                  Prepare client brief <ArrowUpRight size={14} />
+                </button>
+              )}
+            </nav>
+            {![
+              'day',
+              'sales',
+              'spaces',
+              'calendar',
+              'library',
+              'tools',
+              'insights',
+            ].includes(page) && (
               <div className="page-heading">
                 <div>
                   <p className="eyebrow">
@@ -525,58 +706,42 @@ export default function Studio() {
                 Opening your workspace…
               </div>
             )}
-            {page === 'day' && (
-              <>
-                <div className="attention-box">
-                  <div className="attention-icon">
-                    <Inbox size={18} />
+            {page === 'day' &&
+              (dayView === 'brief' ? (
+                <Today
+                  data={data}
+                  ready={ready}
+                  openTask={openTask}
+                  openBrief={setBriefSpaceId}
+                  openSpace={space}
+                  openIntent={openIntent}
+                  capture={() => capture()}
+                  openBoard={() => openBoard()}
+                  openCalendar={() => navigate('calendar')}
+                />
+              ) : (
+                <>
+                  <div className="board-page-heading">
+                    <div>
+                      <h1>
+                        {scope === 'team' ? 'Work, together.' : 'Your work.'}
+                      </h1>
+                      <p>Capture the next step. Keep everything connected.</p>
+                    </div>
+                    <span className="quiet-meta">
+                      {shown.filter((t) => t.stage !== 'Done').length} open
+                      tasks
+                    </span>
                   </div>
-                  <div>
-                    <strong>
-                      {pending.length
-                        ? `${pending.length} ${pending.length === 1 ? 'piece' : 'pieces'} of work ready for your eyes`
-                        : 'You’re all caught up on reviews'}
-                    </strong>
-                    <p>
-                      {pending.length
-                        ? 'A quick review keeps the next step moving.'
-                        : 'Your review requests will appear here.'}
-                    </p>
-                  </div>
-                  {pending.length > 0 && (
-                    <button onClick={() => openTask(pending[0].id)}>
-                      Review work
-                      <ArrowRight size={15} />
-                    </button>
-                  )}
-                </div>
-                <div className="board-toolbar">
-                  <Tabs
-                    value={scope}
-                    onValueChange={(v) => setScope(String(v))}
-                  >
-                    <TabsList className="view-tabs">
-                      <TabsTrigger value="mine">My board</TabsTrigger>
-                      <TabsTrigger value="team">
-                        <Users size={14} />
-                        Team board
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <span className="quiet-meta">
-                    {shown.filter((t) => t.stage !== 'Done').length} open tasks
-                    <span className="divider-dot">·</span>Changes stay connected
-                  </span>
-                </div>
-                {board}
-              </>
-            )}
+                  {board}
+                </>
+              ))}
             {page === 'work' &&
               (projectId ? (
                 <>
                   <button
                     className="back-link"
-                    onClick={() => setProjectId(null)}
+                    onClick={() => navigate('work')}
                   >
                     ← All projects
                   </button>
@@ -643,6 +808,19 @@ export default function Studio() {
                   </div>
                 </>
               ))}
+            {page === 'sales' && (
+              <SalesPipeline
+                data={data}
+                ready={ready}
+                busy={busy}
+                error={error}
+                selected={prospectId}
+                select={selectProspect}
+                capture={capture}
+                act={act}
+                openTask={openTask}
+              />
+            )}
             {page === 'calendar' && (
               <SharedCalendar
                 data={data}
@@ -658,7 +836,8 @@ export default function Studio() {
             {page === 'spaces' &&
               (currentSpace ? (
                 <ClientFocus
-                  key={currentSpace.id}
+                  key={currentSpace.id + ':' + meetingOpenVersion}
+                  initialMeetingId={meetingToOpen}
                   space={currentSpace}
                   data={data}
                   busy={busy}
@@ -672,8 +851,8 @@ export default function Studio() {
               ) : (
                 <ClientDirectory data={data} openSpace={space} />
               ))}
-            {page === 'library' && <ResourceLibrary />}
-            {page === 'tools' && <ResourceLibrary mode="tools" />}
+            {page === 'library' && <ResourceLibrary key="library" />}
+            {page === 'tools' && <ResourceLibrary key="tools" mode="tools" />}
             {page === 'organization' && (
               <div className="client-columns">
                 <section className="surface">
@@ -714,18 +893,11 @@ export default function Studio() {
             )}
             {page === 'blueprints' && <BlueprintRegistry />}
             {page === 'insights' && (
-              <section className="surface roadmap-surface">
-                <ChartNoAxesCombined size={30} />
-                <h2>Evidence starts with connected sources</h2>
-                <p>
-                  Campaign spend, lead quality, and bookings will connect back
-                  to their clients and process blueprints. Sources and reporting
-                  windows will stay visible.
-                </p>
-                <span className="status-label">
-                  No analytics sources connected
-                </span>
-              </section>
+              <ConnectionCoverage
+                data={data}
+                ready={ready}
+                openTools={() => navigate('tools')}
+              />
             )}
             <div className="save-status" role="status" aria-live="polite">
               {busy ? (
@@ -749,6 +921,15 @@ export default function Studio() {
             </div>
           </main>
         </div>
+        <ContextBrief
+          data={data}
+          spaceId={briefSpaceId}
+          close={() => setBriefSpaceId(null)}
+          openSpace={space}
+          openTask={openTask}
+          openProject={project}
+          openMeeting={openMeeting}
+        />
         <Sheet
           open={!!currentTask}
           onOpenChange={(open) => !open && closeTask()}
@@ -768,6 +949,7 @@ export default function Studio() {
             {currentTask && (
               <TaskDetail
                 key={currentTask.id + ':' + (taskFocus || 'default')}
+                openProspect={openProspect}
                 initialTab={taskFocus}
                 task={currentTask}
                 data={data}
@@ -793,6 +975,7 @@ export default function Studio() {
               </div>
             )}
             <QuickCapture
+              key={captureKey}
               data={data}
               ready={ready}
               busy={busy}
@@ -808,76 +991,23 @@ export default function Studio() {
             />
           </DialogContent>
         </Dialog>
-        <CommandDialog
+        <IntentPalette
+          openSales={() => navigate('sales')}
+          openProspect={openProspect}
+          data={data}
           open={search}
-          onOpenChange={setSearch}
-          title="Search your workspace"
-          description="Find tasks, projects, spaces, and documents."
-        >
-          <CommandInput placeholder="Find anything in your workspace…" />
-          <CommandList>
-            <CommandEmpty>No matching records.</CommandEmpty>
-            <CommandGroup heading="Tasks">
-              {data.tasks.map((t) => (
-                <CommandItem
-                  key={t.id}
-                  value={t.title + ' ' + t.id}
-                  onSelect={() => {
-                    openTask(t.id);
-                    setSearch(false);
-                  }}
-                >
-                  <Circle size={16} />
-                  {t.title}
-                  <span className="command-meta">{t.stage}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandGroup heading="Spaces">
-              {data.spaces.map((s) => (
-                <CommandItem
-                  key={s.id}
-                  onSelect={() => {
-                    space(s.id);
-                    setSearch(false);
-                  }}
-                >
-                  <BriefcaseBusiness size={16} />
-                  {s.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandGroup heading="Projects">
-              {data.projects.map((p) => (
-                <CommandItem
-                  key={p.id}
-                  onSelect={() => {
-                    project(p.id);
-                    setSearch(false);
-                  }}
-                >
-                  <Layers size={16} />
-                  {p.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <ResourceCommands done={() => setSearch(false)} />
-            <CommandGroup heading="Documents">
-              {data.documents.map((d) => (
-                <CommandItem
-                  key={d.id}
-                  onSelect={() => {
-                    setDocumentId(d.id);
-                    setSearch(false);
-                  }}
-                >
-                  <FileText size={16} />
-                  {d.title}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </CommandDialog>
+          setOpen={setSearch}
+          query={intentQuery}
+          setQuery={setIntentQuery}
+          openTask={openTask}
+          openSpace={space}
+          openProject={project}
+          openDocument={setDocumentId}
+          openBrief={setBriefSpaceId}
+          capture={capture}
+          openBoard={() => openBoard()}
+          openToday={() => navigate('day')}
+        />
         <Sheet open={notices} onOpenChange={setNotices}>
           <SheetContent className="notification-sheet">
             <SheetHeader>
@@ -931,6 +1061,7 @@ export default function Studio() {
   );
 }
 function TaskDetail({
+  openProspect,
   initialTab,
   task,
   data,
@@ -939,6 +1070,7 @@ function TaskDetail({
   openProject,
   openSpace,
 }: {
+  openProspect: (id: string) => void;
   initialTab?: 'brief' | 'work';
   task: Task;
   data: Workspace;
@@ -954,6 +1086,7 @@ function TaskDetail({
     [reviewer, setReviewer] = useState(task.reviewer),
     [feedback, setFeedback] = useState(''),
     [note, setNote] = useState('');
+  const prospect = data.prospects.find((p) => p.id === task.prospectId);
   const project = data.projects.find((p) => p.id === task.projectId),
     space = data.spaces.find((s) => s.id === taskSpaceId(data, task)),
     member = data.members.find((m) => m.id === task.assignee),
@@ -1009,13 +1142,27 @@ function TaskDetail({
       )}
       <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
         <TabsList variant="line" className="detail-tabs">
-          <TabsTrigger value="brief">Brief & context</TabsTrigger>
+          <TabsTrigger value="brief">Overview</TabsTrigger>
           <TabsTrigger value="work">Work & review</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
       </Tabs>
       {tab === 'brief' && (
         <>
+          {prospect && (
+            <section className="task-client-context">
+              <header>
+                <strong>{prospect.name} · Prospect</strong>
+                <button onClick={() => openProspect(prospect.id)}>
+                  Open sales history <ArrowUpRight size={13} />
+                </button>
+              </header>
+              <p>
+                Sales stage: {prospect.stage}. This next step stays connected to
+                the original conversation.
+              </p>
+            </section>
+          )}
           {space && (
             <section className="task-client-context">
               <header>
@@ -1028,66 +1175,96 @@ function TaskDetail({
               <p>{space.brief}</p>
             </section>
           )}
-          <form className="edit-form" onSubmit={save}>
-            <label>
-              Task name
-              <Input
-                name="title"
-                defaultValue={task.title}
-                required
-                maxLength={180}
-              />
-            </label>
-            <label>
-              The brief
-              <Textarea
-                name="description"
-                defaultValue={task.description}
-                rows={7}
-              />
-            </label>
-            <div className="field-grid">
-              <label>
-                Responsible
-                <Picker
-                  label="Responsible"
-                  value={assignee}
-                  onChange={setAssignee}
-                  items={data.members.map((m) => ({
-                    value: m.id,
-                    label: m.name,
-                  }))}
-                />
-              </label>
-              <label>
-                Reviewer
-                <Picker
-                  label="Reviewer"
-                  value={reviewer}
-                  onChange={setReviewer}
-                  items={data.members.map((m) => ({
-                    value: m.id,
-                    label: m.name,
-                  }))}
-                />
-              </label>
-              <label>
-                Due date
-                <Input name="due" type="date" defaultValue={task.due} />
-              </label>
-              <label>
-                Blocking reason
-                <Input
-                  name="blocked"
-                  defaultValue={task.blocked}
-                  placeholder="Nothing blocking"
-                />
-              </label>
-            </div>
-            <Button type="submit" variant="outline" disabled={busy}>
-              Save changes
-            </Button>
-          </form>
+          <section className="task-read-brief">
+            <p>
+              {task.description ||
+                'Add a brief so the next step has the context it needs.'}
+            </p>
+            <dl>
+              <div>
+                <dt>Deadline</dt>
+                <dd>{readableDate(task.due)}</dd>
+              </div>
+              <div>
+                <dt>Reviewer</dt>
+                <dd>
+                  {data.members.find((m) => m.id === task.reviewer)?.name ||
+                    'Unassigned'}
+                </dd>
+              </div>
+              <div>
+                <dt>Priority</dt>
+                <dd>{task.priority || 'Normal'}</dd>
+              </div>
+            </dl>
+          </section>
+          <Collapsible className="task-edit-disclosure">
+            <CollapsibleTrigger className="task-edit-trigger">
+              Edit task details <ChevronRight size={15} />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <form className="edit-form" onSubmit={save}>
+                <label>
+                  Task name
+                  <Input
+                    name="title"
+                    defaultValue={task.title}
+                    required
+                    maxLength={180}
+                  />
+                </label>
+                <label>
+                  The brief
+                  <Textarea
+                    name="description"
+                    defaultValue={task.description}
+                    rows={7}
+                  />
+                </label>
+                <div className="field-grid">
+                  <label>
+                    Responsible
+                    <Picker
+                      label="Responsible"
+                      value={assignee}
+                      onChange={setAssignee}
+                      items={data.members.map((m) => ({
+                        value: m.id,
+                        label: m.name,
+                      }))}
+                    />
+                  </label>
+                  <label>
+                    Reviewer
+                    <Picker
+                      label="Reviewer"
+                      value={reviewer}
+                      onChange={setReviewer}
+                      items={data.members.map((m) => ({
+                        value: m.id,
+                        label: m.name,
+                      }))}
+                    />
+                  </label>
+                  <label>
+                    Due date
+                    <Input name="due" type="date" defaultValue={task.due} />
+                  </label>
+                  <label>
+                    Blocking reason
+                    <Input
+                      name="blocked"
+                      defaultValue={task.blocked}
+                      placeholder="Nothing blocking"
+                    />
+                  </label>
+                </div>
+                <Button type="submit" variant="outline" disabled={busy}>
+                  Save changes
+                </Button>
+              </form>
+            </CollapsibleContent>
+          </Collapsible>
           <RelatedResources target={{ type: 'task', id: task.id }} />
           <h3 className="detail-heading">Notes & decisions</h3>
           {data.notes
