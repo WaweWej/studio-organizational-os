@@ -1,8 +1,17 @@
-import type { Workspace } from './model';
+import type { Workspace, Task, Stage } from './model';
 import { parseCapture, type CaptureMention } from './task-capture';
 import { parseSalesCapture } from './sales-model';
 
-export type EntryKind = 'task' | 'note' | 'meeting' | 'deadline' | 'sales';
+export type EntryKind =
+  | 'task'
+  | 'note'
+  | 'meeting'
+  | 'deadline'
+  | 'sales'
+  | 'progress'
+  | 'blocker'
+  | 'status'
+  | 'project';
 export type EntryTarget = { type: 'space' | 'project' | 'task'; id: string };
 export type CaptureEntry = {
   id: string;
@@ -27,8 +36,18 @@ export type EntryOptions = {
   now?: Date;
   meetingDate?: string;
   meetingTime?: string;
+  focusTaskId?: string | null;
 };
 export function inferEntryKind(text: string): EntryKind {
+  if (/^\s*(?:create|start|new)\s+(?:a\s+)?(?:new\s+)?project\b/i.test(text))
+    return 'project';
+  if (
+    /^\s*(progress|update)\s*:/i.test(text) ||
+    /^\s*progress\s+["“]/i.test(text)
+  )
+    return 'progress';
+  if (/^\s*(blocked|blocker|unblocked)\b/i.test(text)) return 'blocker';
+  if (/^\s*(status\b|ready for review\b)/i.test(text)) return 'status';
   if (/^\s*task\s*:/i.test(text)) return 'task';
   if (/^\s*sales\s+meeting\s+with\b/i.test(text)) return 'sales';
   if (/^\s*(note\b|meeting notes?\b|idea\b|decision\b)/i.test(text))
@@ -52,6 +71,7 @@ export function interpretEntry(
     options.kind && options.kind !== 'auto'
       ? options.kind
       : inferEntryKind(text);
+  const isUpdate = isTaskUpdate(kind);
   const parsed = parseCapture(text, data, {
     projectId: options.projectId,
     pins: options.pins,
@@ -59,9 +79,42 @@ export function interpretEntry(
   });
   const errors = parsed.errors.filter(
     (e) =>
-      !(kind === 'note' && e === 'Keep the task name under 180 characters.'),
+      !(
+        (kind === 'note' || isUpdate) &&
+        e === 'Keep the task name under 180 characters.'
+      ),
   );
+  const quoted = isUpdate
+    ? /^\s*(?:progress|update|blocked|blocker|unblocked|status|ready for review)\s+["“]([^"”]+)["”](?:\s*:|\s*$)/i.exec(
+        text,
+      )?.[1]
+    : /["“]([^"”]+)["”]/.exec(text)?.[1];
   let target = options.target || null;
+  if (isUpdate && quoted) {
+    const matches = data.tasks.filter(
+      (t) => t.title.toLowerCase() === quoted.toLowerCase(),
+    );
+    if (target?.type === 'task') {
+      if (!matches.some((t) => t.id === target!.id))
+        errors.push('The selected task and the sentence do not match.');
+    } else if (matches.length === 1)
+      target = { type: 'task', id: matches[0].id };
+    else
+      errors.push(
+        matches.length > 1
+          ? 'More than one task has that name. Choose the right task.'
+          : 'That task could not be found. Choose the task to update.',
+      );
+  }
+  // Only use the visible desk context when no explicit work was named.
+  if (
+    !target &&
+    options.focusTaskId &&
+    (kind === 'note' || !quoted) &&
+    !parsed.mentions.some((m) => m.kind !== 'date') &&
+    (isUpdate || kind === 'note' || kind === 'deadline')
+  )
+    target = { type: 'task', id: options.focusTaskId };
   let spaceId =
       parsed.spaceId || (!parsed.projectId ? options.spaceId || null : null),
     projectId = parsed.projectId,
@@ -110,7 +163,11 @@ export function interpretEntry(
         ? { type: 'space', id: spaceId }
         : null;
   let title = parsed.title.replace(/^task\s*:\s*/i, '');
-  let body = title.replace(
+  let writing = text;
+  for (const mention of [...parsed.mentions].sort((a, b) => b.start - a.start))
+    writing = writing.slice(0, mention.start) + writing.slice(mention.end);
+  writing = writing.replace(/[ \t]+/g, ' ').trim();
+  let body = (kind === 'note' ? writing : title).replace(
     /^(?:meeting notes?|note|idea|decision)\b(?:\s+(?:for|on))?\s*:?\s*/i,
     '',
   );
@@ -172,6 +229,55 @@ export function interpretEntry(
       ? data.tasks.find((t) => t.id === taskId)?.title || title
       : data.projects.find((p) => p.id === projectId)?.name || title;
   }
+  let nextStage: Stage | null = null;
+  let clearBlocker = false;
+  if (isUpdate) {
+    if (!taskId) errors.push('Choose the task this update belongs to.');
+    const withoutTitle = quoted
+      ? writing.replace(/["“][^"”]+["”]/, '')
+      : writing;
+    body = withoutTitle
+      .replace(
+        /^(?:progress|update|blocked|blocker|unblocked|status|ready for review)\b\s*:?\s*/i,
+        '',
+      )
+      .replace(/^:\s*/, '')
+      .trim();
+    title = data.tasks.find((t) => t.id === taskId)?.title || 'Task update';
+    if (parsed.due)
+      errors.push(
+        'Use Deadline to change a date, or remove the date from this update.',
+      );
+    if (kind === 'progress' && !body) errors.push('Write what moved forward.');
+    if (kind === 'blocker') {
+      clearBlocker = /^\s*unblocked\b/i.test(text);
+      if (!clearBlocker && !body)
+        errors.push('Describe what is blocking this task.');
+      if (body.length > 500)
+        errors.push('Keep the blocking reason under 500 characters.');
+      if (clearBlocker) body = body ? 'Unblocked: ' + body : 'Blocker cleared';
+    }
+    if (kind === 'status') {
+      const value = /^\s*ready for review\b/i.test(text)
+        ? 'review'
+        : body.toLowerCase().replace(/[.!]$/, '').trim();
+      nextStage =
+        (
+          {
+            doing: 'Doing',
+            'in progress': 'Doing',
+            'up next': 'Up next',
+            review: 'Review',
+            'ready for review': 'Review',
+            done: 'Done',
+            complete: 'Done',
+          } as Record<string, Stage>
+        )[value] || null;
+      if (!nextStage)
+        errors.push('Use a status: Doing, Up next, Review, or Done.');
+      body = nextStage ? 'Status: ' + nextStage : body;
+    }
+  }
   const timeMatch = /\bat\s+(\d{1,2}[:.]\d{2})\b/i.exec(text);
   const meetingTime =
     options.meetingTime ||
@@ -201,6 +307,8 @@ export function interpretEntry(
     const sales = parseSalesCapture(text, options.now);
     return {
       kind,
+      nextStage,
+      clearBlocker,
       title: sales?.nextStep || '',
       body: '',
       target: null,
@@ -216,6 +324,8 @@ export function interpretEntry(
   }
   return {
     kind,
+    nextStage,
+    clearBlocker,
     title,
     body,
     target,
@@ -237,6 +347,9 @@ export function captureDestination(
   const project = data.projects.find((p) => p.id === entry.projectId);
   const space = data.spaces.find((s) => s.id === entry.spaceId);
   const context = task?.title || project?.name || space?.name;
+  if (entry.kind === 'project') return `${project?.name || 'Work'} · Project`;
+  if (isTaskUpdate(entry.kind))
+    return `${context || 'Choose a task'} · ${entry.kind === 'progress' ? 'Progress' : entry.kind === 'blocker' ? 'Blocker' : 'Status'}`;
   return entry.kind === 'note'
     ? `${context || 'Your desk'} · Notes`
     : entry.kind === 'meeting'
@@ -246,4 +359,13 @@ export function captureDestination(
         : entry.kind === 'sales'
           ? 'Sales pipeline · Next action'
           : `${project?.name || space?.name || 'Your board'} · Up next`;
+}
+
+export function isTaskUpdate(kind: EntryKind) {
+  return ['progress', 'blocker', 'status'].includes(kind);
+}
+export function blockerRecipients(task: Task, actor: string) {
+  return [...new Set([task.assignee, task.reviewer])].filter(
+    (id) => id && id !== actor,
+  );
 }

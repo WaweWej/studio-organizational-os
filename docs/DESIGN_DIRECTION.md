@@ -18,7 +18,7 @@ The previous interface put every module in the navigation and asked people to as
 
 | Place   | The question it answers                              | Secondary views                                  |
 | ------- | ---------------------------------------------------- | ------------------------------------------------ |
-| Today   | What needs me, and where do I continue?              | Desk, brief, my board, team board                      |
+| Today   | What needs me, and where do I continue?              | Desk, brief, my board, team board                |
 | Spaces  | Who are we doing this for, and what matters to them? | Branded client home, meetings, work, references  |
 | Sales   | Which relationships are moving toward a sale?        | Prospects, conversations, pipeline, next actions |
 | Work    | What are we delivering together?                     | Projects, shared calendar, project board         |
@@ -54,7 +54,7 @@ Model interpretation belongs at entry points and between connected records, rath
 
 ## Visual system
 
-Warm neutral canvas, legible ink, a narrow five-place rail, generous spacing, and quiet translucent surfaces. Accent color identifies actions and selection; client color identifies context. Depth distinguishes the persistent workspace from temporary context. Ordinary labels and task titles remain high contrast. Motion is restrained and respects reduced-motion preferences. Mobile uses the existing accessible navigation drawer and stacks the brief without dropping actions.
+Warm neutral canvas, legible ink, a narrow navigation rail, generous spacing, and quiet translucent surfaces. Accent color identifies actions and selection; client color identifies context. Depth distinguishes the persistent workspace from temporary context. Ordinary labels and task titles remain high contrast. Motion is restrained and respects reduced-motion preferences. Mobile uses the existing accessible navigation drawer and stacks the brief without dropping actions.
 
 ## Scope and remaining foundations
 
@@ -80,10 +80,18 @@ Prospects have their own pipeline stages and history; active clients retain thei
 
 ## The screen that stays open
 
-Today’s Desk is a continuous capture surface. Enter focuses capture; saving clears the input and preserves a durable entry with a link to its destination. Notes, tasks, client meetings, deadline changes, and sales conversations share the same input. Sales has its own primary navigation item.
+Desk is a primary navigation destination and the default continuous capture surface. Enter focuses capture; saving clears the input and preserves a durable entry with a link to its destination. Notes, tasks, client meetings, deadline changes, and sales conversations share the same input. Sales has its own primary navigation item.
 
 Explicit note/meeting/deadline phrases and common action verbs determine the initial type. People can override the type and select a destination. Unrecognized text defaults to a note on the desk, never a silently invented task. Existing client/project context is inherited, with explicit references taking precedence and conflicts surfaced. This uses deterministic interpretation; a model remains unconnected.
 
 Capture entries hold canonical notes and receipts for other records. Connected notes appear with the client, project, and task, while the original entry remains searchable and visible in Desk history. Notes from sibling tasks do not leak into each other’s context. Meeting captures create client meeting records, not calendar invitations. Deadline captures update existing task/project dates. Every mutation is scoped to the authenticated workspace, and related history is written atomically with its record.
 
 The future AI contract is to propose those same typed destinations and commands, preserving the source text, correction path, and explicit uncertainty. Its success is measured by how little organizational effort the employee needs after writing something down.
+
+## The reactive page · 9 September 2026
+
+The latest visual direction supersedes the earlier dashboard-like Desk. At rest, the Desk should resemble a blank white page. No slogans, hero copy, instructional paragraphs, action grids, or accumulating activity feed. One writing area dominates. A selected task remains a single quiet context row; history and attention live in drawers. The screenshot feedback specifically rejected redundant breadcrumb/sample labels, decorative captions, repeated capture instructions, and a busy attention panel.
+
+Typing reveals only the structure required by the intention. “Create new project” unfolds a project module in the same place: name, brief, client, deadline and optional files. Completing it returns to writing with one dismissible receipt. Notes can span lines with Shift+Enter. Task/client/project references, dates and proposed effects remain inspectable while writing, and uncertain destinations require a choice. Do not fill the empty page with explanations of its emptiness.
+
+The input, interpretation, modular entry renderer, command validation and receipts are separate concerns. The present interpreter is deterministic; there is no live AI provider. Future AI can expand the set of understood intentions and propose structured modules, but every actual write still passes through validated, scoped commands. The page is the interaction surface, not a chat conversation users must manage.

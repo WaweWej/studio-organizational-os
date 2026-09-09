@@ -30,3 +30,9 @@ Self-contained HTML tools can run in an iframe sandbox permitting scripts, forms
 ## Validation
 
 `tests/resources.mjs` covers authenticated ciphertext round trips, wrong-password and tamper rejection, vault/record binding, fresh IVs, key non-extractability, absence of credentials in workspace responses, organization isolation, revision conflicts, safe URLs, R2 upload/download, tool response sandbox policy, and upload size limits. Tests use synthetic secrets and exact-ID cleanup. These checks do not constitute a penetration test or browser sandbox audit.
+
+## Desk writes and upload retries
+
+Desk task updates and project capture validate canonical destinations inside the authenticated organization. Optimistic task revisions and guarded atomic batches prevent stale captures from leaving receipts, notes or alerts behind. Review-related status changes call the existing review engine. The Desk does not send Slack messages, email, invitations or external deliveries.
+
+Optional upload IDs are validated UUIDs. The server computes a digest covering file bytes, metadata and initial targets, stores only that digest in private object metadata, and rejects mismatched reuse. Each upload attempt uses an independent object key. Only the winning database record receives links; cleanup cannot delete another attempt’s committed object. Existing files retain authenticated download and sandbox handling. `tests/desk.mjs` exercises identical concurrent uploads, byte conflicts, organization isolation and download integrity without modifying vault settings.

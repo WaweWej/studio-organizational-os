@@ -1,3 +1,5 @@
+import { mutateProjectCapture } from './project-capture-store';
+import { blockerRecipients, type CaptureEntry } from './entry-model';
 import { mutateEntry, captureInsert } from './entry-store';
 import { mutateSales } from './sales-store';
 import { mutateResource, upgradeResources } from './resource-store';
@@ -176,10 +178,18 @@ function newTask(
     meetingId: null,
   };
 }
-export async function mutate(c: Context, input: Record<string, unknown>) {
+export async function mutate(
+  c: Context,
+  input: Record<string, unknown>,
+  capture?: { row: CaptureEntry; fingerprint: string },
+) {
   const type = textValue(input.type, 'Action', 40, true),
     now = new Date().toISOString(),
     nonce = crypto.randomUUID();
+  if (type === 'project-capture') {
+    await mutateProjectCapture(c, input);
+    return;
+  }
   if (type === 'capture-entry') {
     await mutateEntry(c, input);
     return;
@@ -503,7 +513,46 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
     updates.delivery = 'Internal completion';
     activity = 'Completed internal work; no external delivery was sent';
   };
-  if (type === 'deadline') {
+  if (type === 'progress' || type === 'blocker') {
+    if (!capture) throw new AppError('Record this update through capture.');
+    const body = textValue(
+      input.body,
+      'Update',
+      type === 'blocker' ? 520 : 2000,
+      true,
+    );
+    if (type === 'blocker') {
+      if (task.stage === 'Done')
+        throw new AppError('Reopen the task before changing its blocker.');
+      updates.blocked =
+        input.clear === true
+          ? ''
+          : textValue(body, 'Blocking reason', 500, true);
+      activity = input.clear === true ? body : 'Blocked: ' + body;
+      for (const recipient of blockerRecipients(task, c.actor))
+        notify(
+          recipient,
+          (input.clear === true ? 'Unblocked: ' : 'Needs help: ') +
+            task.title +
+            (input.clear === true ? '' : ' — ' + body),
+        );
+    } else activity = 'Progress: ' + body;
+    secondary.push(
+      insert(
+        c.db,
+        'notes',
+        c.org,
+        {
+          id: capture.row.id,
+          taskId: id,
+          body: activity,
+          actor: c.actor,
+          createdAt: now,
+        },
+        guard,
+      ),
+    );
+  } else if (type === 'deadline') {
     updates.due = dateValue(input.due);
     activity = updates.due
       ? 'Set the deadline to ' + updates.due
@@ -529,8 +578,9 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
     activity = 'Updated the brief and task details';
   } else if (type === 'move') {
     const stage = stageValue(input.stage);
-    if (stage === task.stage) return;
-    if (stage === 'Review') submit();
+    if (stage === task.stage && !capture) return;
+    if (stage === task.stage) activity = 'Confirmed status: ' + stage;
+    else if (stage === 'Review') submit();
     else if (stage === 'Done') await complete();
     else {
       updates.stage = stage;
@@ -581,6 +631,29 @@ export async function mutate(c: Context, input: Record<string, unknown>) {
     notify(task.assignee, `${decision}: ${task.title}`);
   } else if (type === 'complete') await complete();
   else throw new AppError('Unknown action.');
+  if (capture) {
+    secondary.push(
+      captureInsert(c, capture.row, nonce, capture.fingerprint, { taskId: id }),
+    );
+    if (capture.row.spaceId)
+      secondary.push(
+        insert(
+          c.db,
+          'spaceEvents',
+          c.org,
+          {
+            id: crypto.randomUUID(),
+            spaceId: capture.row.spaceId,
+            meetingId: null,
+            body: task.title + ' · ' + activity,
+            snapshot: JSON.stringify({ captureId: capture.row.id, taskId: id }),
+            actor: c.actor,
+            createdAt: now,
+          },
+          guard,
+        ),
+      );
+  }
   const fields = Object.keys(updates);
   const update = c.db
     .prepare(

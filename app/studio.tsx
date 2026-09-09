@@ -45,6 +45,7 @@ import {
   Check,
   FileText,
   Inbox,
+  PanelTop,
   LoaderCircle,
 } from 'lucide-react';
 import {
@@ -93,6 +94,7 @@ import {
 } from '@/lib/model';
 
 const navigation = [
+  { id: 'desk', name: 'Desk', icon: PanelTop },
   { id: 'day', name: 'Today', icon: Sun },
   { id: 'spaces', name: 'Spaces', icon: BriefcaseBusiness },
   { id: 'sales', name: 'Sales', icon: Handshake },
@@ -164,6 +166,7 @@ export default function Studio() {
   const captureDrafts = useRef(new Map<string, CaptureDraft>());
   const [capturedNoteId, setCapturedNoteId] = useState<string | null>(null);
   const [prospectId, setProspectId] = useState<string | null>(null);
+  const [deskTaskId, setDeskTaskId] = useState<string | null>(null);
   const [dayView, setDayView] = useState('brief');
   const [intentQuery, setIntentQuery] = useState('');
   const [briefSpaceId, setBriefSpaceId] = useState<string | null>(null);
@@ -176,7 +179,7 @@ export default function Studio() {
   );
   const [data, setData] = useState<Workspace>(initialWorkspace),
     [ready, setReady] = useState(false),
-    [page, setPage] = useState('day'),
+    [page, setPage] = useState('desk'),
     [scope, setScope] = useState('mine'),
     [selected, setSelected] = useState<string | null>(null),
     [spaceId, setSpaceId] = useState<string | null>(null),
@@ -226,8 +229,11 @@ export default function Studio() {
       setProspectId(params.get('prospect'));
     }
     if (params.get('desk') === '1') {
-      setPage('day');
-      setDayView('desk');
+      setPage('desk');
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', 'desk');
+      url.searchParams.delete('desk');
+      window.history.replaceState(null, '', url);
     }
     if (params.get('task')) setSelected(params.get('task'));
     if (params.get('project')) {
@@ -242,6 +248,7 @@ export default function Studio() {
   }, []);
   useEffect(() => {
     if (
+      page === 'desk' ||
       (page === 'day' && dayView !== 'brief') ||
       (page === 'work' && !!projectId) ||
       prospectId ||
@@ -424,13 +431,7 @@ export default function Studio() {
     url.searchParams.delete('desk');
     window.history.replaceState(null, '', url);
   };
-  const openDesk = () => {
-    navigate('day');
-    setDayView('desk');
-    const url = new URL(window.location.href);
-    url.searchParams.set('desk', '1');
-    window.history.replaceState(null, '', url);
-  };
+  const openDesk = () => navigate('desk');
   const openEntry = (entry: CaptureEntry) => {
     setCreate(false);
     if (entry.targetType === 'note') setCapturedNoteId(entry.id);
@@ -530,8 +531,12 @@ export default function Studio() {
           <header className="topbar">
             <div className="crumb">
               <SidebarTrigger />
-              <span>Studio</span>
-              <ChevronRight size={14} />
+              {page !== 'desk' && (
+                <>
+                  <span>Studio</span>
+                  <ChevronRight size={14} />
+                </>
+              )}
               <strong>
                 {currentSpace?.name ||
                   currentProject?.name ||
@@ -552,25 +557,25 @@ export default function Studio() {
                 onClick={() => setNotices(true)}
               >
                 <Bell size={19} />
-                {data.notices.some((n) => !n.read) && (
-                  <span className="notification-dot" />
-                )}
+                {data.notices.some(
+                  (n) => !n.read && n.recipient === data.currentMember,
+                ) && <span className="notification-dot" />}
               </button>
-              <span className="top-workspace-state">
-                {data.demo ? 'Sample workspace' : 'Private workspace'}
-              </span>
+              {page !== 'desk' && (
+                <span className="top-workspace-state">
+                  {data.demo ? 'Sample workspace' : 'Private workspace'}
+                </span>
+              )}
             </div>
           </header>
-          <main className="workspace-content">
+          <main
+            className={
+              'workspace-content' + (page === 'desk' ? ' desk-page' : '')
+            }
+          >
             <nav className="context-nav" aria-label="Workspace views">
               {page === 'day' && (
                 <>
-                  <button
-                    className={dayView === 'desk' ? 'active' : ''}
-                    onClick={openDesk}
-                  >
-                    Desk
-                  </button>
                   <button
                     className={dayView === 'brief' ? 'active' : ''}
                     onClick={() => changeDayView('brief')}
@@ -644,6 +649,7 @@ export default function Studio() {
               )}
             </nav>
             {![
+              'desk',
               'day',
               'sales',
               'spaces',
@@ -733,26 +739,31 @@ export default function Studio() {
                 Opening your workspace…
               </div>
             )}
+            {page === 'desk' && (
+              <WorkingDesk
+                data={data}
+                ready={ready}
+                busy={busy}
+                error={error}
+                act={act}
+                drafts={captureDrafts.current}
+                openEntry={openEntry}
+                focusTaskId={deskTaskId}
+                setFocusTask={setDeskTaskId}
+                openTask={openTask}
+                openBrief={setBriefSpaceId}
+                enabled={
+                  !selected &&
+                  !create &&
+                  !search &&
+                  !notices &&
+                  !briefSpaceId &&
+                  !capturedNoteId
+                }
+              />
+            )}
             {page === 'day' &&
-              (dayView === 'desk' ? (
-                <WorkingDesk
-                  data={data}
-                  ready={ready}
-                  busy={busy}
-                  error={error}
-                  act={act}
-                  drafts={captureDrafts.current}
-                  openEntry={openEntry}
-                  enabled={
-                    !selected &&
-                    !create &&
-                    !search &&
-                    !notices &&
-                    !briefSpaceId &&
-                    !capturedNoteId
-                  }
-                />
-              ) : dayView === 'brief' ? (
+              (dayView === 'brief' ? (
                 <Today
                   data={data}
                   ready={ready}
@@ -949,7 +960,13 @@ export default function Studio() {
                 openTools={() => navigate('tools')}
               />
             )}
-            <div className="save-status" role="status" aria-live="polite">
+            <div
+              className={
+                'save-status' + (page === 'desk' ? ' desk-global-status' : '')
+              }
+              role="status"
+              aria-live="polite"
+            >
               {busy ? (
                 <>
                   <LoaderCircle size={13} className="animate-spin" />

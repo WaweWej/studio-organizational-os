@@ -1,7 +1,8 @@
-import { readWorkspace, type Context } from './store';
+import { readWorkspace, mutate, type Context } from './store';
 import { AppError, textValue, dateValue, revisionValue } from './validation';
 import {
   interpretEntry,
+  isTaskUpdate,
   type CaptureEntry,
   type EntryKind,
   type EntryTarget,
@@ -46,8 +47,12 @@ export async function mutateEntry(c: Context, input: Record<string, unknown>) {
   if (sourceText.length > 2000)
     throw new AppError('Keep the entry under 2,000 characters.');
   const kind = textValue(input.kind, 'Entry kind', 20, true) as EntryKind;
-  if (!['note', 'meeting', 'deadline'].includes(kind))
-    throw new AppError('Choose a note, meeting, or deadline.');
+  if (
+    !['note', 'meeting', 'deadline', 'progress', 'blocker', 'status'].includes(
+      kind,
+    )
+  )
+    throw new AppError('Choose a supported entry type.');
   const day = dateValue(input.captureDay);
   if (!day) throw new AppError('Capture date is required.');
   const defaultSpace =
@@ -152,6 +157,35 @@ export async function mutateEntry(c: Context, input: Record<string, unknown>) {
     actor: c.actor,
     createdAt: now,
   };
+  if (isTaskUpdate(kind)) {
+    try {
+      await mutate(
+        c,
+        {
+          type:
+            kind === 'status'
+              ? 'move'
+              : kind === 'blocker'
+                ? 'blocker'
+                : 'progress',
+          id: draft.taskId,
+          revision: input.revision,
+          body: draft.body,
+          clear: draft.clearBlocker,
+          stage: draft.nextStage,
+        },
+        { row, fingerprint },
+      );
+    } catch (error) {
+      // A concurrent identical retry may finish between parsing and the guarded update.
+      const saved = await c.db
+        .prepare('SELECT fingerprint FROM captureEntries WHERE org=? AND id=?')
+        .bind(c.org, id)
+        .first<{ fingerprint: string }>();
+      if (saved?.fingerprint !== fingerprint) throw error;
+    }
+    return;
+  }
   const guard =
     'EXISTS (SELECT 1 FROM captureEntries WHERE org=? AND id=? AND lastMutation=?)';
   let first = captureInsert(c, row, nonce, fingerprint);

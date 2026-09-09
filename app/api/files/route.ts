@@ -35,24 +35,77 @@ export async function POST(request: Request) {
       textValue(form.get('folderId') ?? '', 'Folder', 100) || null;
     if (folderId) await recordExists(c, 'folders', folderId);
     const targets = await validateTargets(
-        c,
-        JSON.parse(
-          textValue(form.get('targets') || '[]', 'Connections', 20000),
-        ),
-      ),
-      id = crypto.randomUUID(),
-      fileKey = `${c.org}/${id}`,
+      c,
+      JSON.parse(textValue(form.get('targets') || '[]', 'Connections', 20000)),
+    );
+    const uploadId = textValue(form.get('uploadId') ?? '', 'Upload ID', 36);
+    if (
+      uploadId &&
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        uploadId,
+      )
+    )
+      throw new AppError('Invalid upload ID.');
+    const id = uploadId || crypto.randomUUID(),
+      fileKey = c.org + '/' + id + '/' + crypto.randomUUID(),
       now = new Date().toISOString(),
       filename = Array.from(file.name)
-        .filter((c) => c.charCodeAt(0) >= 32 && c.charCodeAt(0) !== 127)
+        .filter(
+          (char) => char.charCodeAt(0) >= 32 && char.charCodeAt(0) !== 127,
+        )
         .join('')
-        .slice(0, 220);
-    await env.ASSETS.put(fileKey, file.stream());
+        .slice(0, 220),
+      content = await file.arrayBuffer(),
+      digest = Array.from(
+        new Uint8Array(await crypto.subtle.digest('SHA-256', content)),
+      )
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join(''),
+      fingerprint = Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            'SHA-256',
+            new TextEncoder().encode(
+              JSON.stringify({
+                digest,
+                filename,
+                kind,
+                mime: file.type.slice(0, 150),
+                folderId,
+                targets: targets.map((t) => t.type + ':' + t.id).sort(),
+              }),
+            ),
+          ),
+        ),
+      )
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    const find = () =>
+      c.db
+        .prepare('SELECT fileKey FROM resources WHERE org=? AND id=?')
+        .bind(c.org, id)
+        .first<{ fileKey: string }>();
+    const checkRetry = async (existing: { fileKey: string }) => {
+      const object = await env.ASSETS.head(existing.fileKey);
+      if (object?.customMetadata?.captureFingerprint !== fingerprint)
+        throw new AppError(
+          'This upload was already saved with different details.',
+          409,
+        );
+    };
+    const existing = await find();
+    if (existing) {
+      await checkRetry(existing);
+      return json(await readWorkspace(c));
+    }
+    await env.ASSETS.put(fileKey, content, {
+      customMetadata: { captureFingerprint: fingerprint },
+    });
     try {
-      await c.db.batch([
+      const result = await c.db.batch([
         c.db
           .prepare(
-            'INSERT INTO resources (org,id,title,kind,source,owner,filename,mime,size,fileKey,folderId,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            'INSERT OR IGNORE INTO resources (org,id,title,kind,source,owner,filename,mime,size,fileKey,folderId,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
           )
           .bind(
             c.org,
@@ -72,14 +125,36 @@ export async function POST(request: Request) {
         ...targets.map((t) =>
           c.db
             .prepare(
-              'INSERT INTO resourceLinks (org,id,resourceId,targetType,targetId) VALUES (?,?,?,?,?)',
+              'INSERT INTO resourceLinks (org,id,resourceId,targetType,targetId) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM resources WHERE org=? AND id=? AND fileKey=?)',
             )
-            .bind(c.org, `${id}:${t.type}:${t.id}`, id, t.type, t.id),
+            .bind(
+              c.org,
+              id + ':' + t.type + ':' + t.id,
+              id,
+              t.type,
+              t.id,
+              c.org,
+              id,
+              fileKey,
+            ),
         ),
       ]);
-    } catch (e) {
-      await env.ASSETS.delete(fileKey);
-      throw e;
+      if (!result[0].meta.changes) {
+        await env.ASSETS.delete(fileKey);
+        const winner = await find();
+        if (!winner)
+          throw new AppError('The file could not be saved. Try again.', 409);
+        await checkRetry(winner);
+      }
+    } catch (error) {
+      // Do not remove a committed object's bytes after an uncertain database response.
+      const committed = await find();
+      if (committed?.fileKey !== fileKey) await env.ASSETS.delete(fileKey);
+      else {
+        await checkRetry(committed);
+        return json(await readWorkspace(c));
+      }
+      throw error;
     }
     return json(await readWorkspace(c));
   } catch (e) {
