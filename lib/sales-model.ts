@@ -30,8 +30,10 @@ export type ProspectEvent = {
 export const prospectNameKey = (name: string) =>
   name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en');
 export function parseSalesCapture(text: string, now = new Date()) {
-  if (!/^\s*sales\s+meeting\s+with\b/i.test(text)) return null;
-  const source = text.replace(/^\s*sales\s+meeting\s+with\s*/i, '').trim();
+  if (!/^\s*(?:sales\s+meeting\s+with|\/sales)\b/i.test(text)) return null;
+  const source = text
+    .replace(/^\s*(?:sales\s+meeting\s+with|\/sales)\s*/i, '')
+    .trim();
   const match =
     /^(?:"([^"]+)"|“([^”]+)”|'([^']+)'|([^,;]+?))\s*[,;]?\s*next\s+step\s*:\s*([\s\S]*)$/i.exec(
       source,

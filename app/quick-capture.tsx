@@ -1,4 +1,10 @@
 'use client';
+import {
+  commandQuery,
+  commandSuggestions,
+  stripEntryPrefix,
+  type DeskIntent,
+} from '@/lib/desk-intents';
 import ProjectCapture, { type ProjectDraft } from './project-capture';
 import {
   useState,
@@ -124,7 +130,8 @@ export default function QuickCapture({
     [choice, setChoice] = useState(''),
     [dismissed, setDismissed] = useState(''),
     [saving, setSaving] = useState(false),
-    [optionsOpen, setOptionsOpen] = useState(false);
+    [optionsOpen, setOptionsOpen] = useState(false),
+    [attempted, setAttempted] = useState(false);
   const input = useRef<HTMLInputElement | HTMLTextAreaElement>(null),
     submitting = useRef(false),
     request = useRef<{ fingerprint: string; id: string } | null>(null),
@@ -155,6 +162,10 @@ export default function QuickCapture({
         'That local time does not exist on this date. Choose another time.',
       );
   }
+  const slash = commandQuery(text),
+    actionMenuOpen = slash !== null;
+  const actions = actionMenuOpen ? commandSuggestions(slash) : [];
+  const action = actions.find((a) => 'action:' + a.id === choice) || actions[0];
   const update = isTaskUpdate(entry.kind);
   const updatingTask = data.tasks.find((t) => t.id === entry.taskId);
   const recipients = updatingTask
@@ -254,6 +265,7 @@ export default function QuickCapture({
     return () => window.removeEventListener('beforeunload', warn);
   }, [text, drafts, draftKey]);
   const edit = (next: string, nextCaret?: number) => {
+    setAttempted(false);
     setPins((previous) => shiftMentionPins(text, next, previous));
     setText(next);
     setCaret(nextCaret ?? input.current?.selectionStart ?? next.length);
@@ -308,7 +320,38 @@ export default function QuickCapture({
       input.current?.setSelectionRange(start + add.length, start + add.length);
     });
   };
+  const chooseAction = (action: DeskIntent) => {
+    setKind('auto');
+    setTarget(null);
+    setText(action.insert);
+    setPins([]);
+    setCaret(action.insert.length);
+    setChoice('');
+    setOptionsOpen(false);
+    setAttempted(false);
+    requestAnimationFrame(() => {
+      input.current?.focus();
+      input.current?.setSelectionRange(
+        action.insert.length,
+        action.insert.length,
+      );
+    });
+  };
+  const setDeadlineDate = (value: string) => {
+    let next = text;
+    for (const m of [...parsed.mentions]
+      .filter((m) => m.kind === 'date')
+      .sort((a, b) => b.start - a.start))
+      next = next.slice(0, m.start) + next.slice(m.end);
+    next = next.trimEnd() + (value ? ' @' + value : '');
+    edit(next, next.length);
+  };
   const save = async () => {
+    if (actionMenuOpen) {
+      if (action) chooseAction(action);
+      return;
+    }
+    setAttempted(true);
     if (entry.errors.length || submitting.current || busy || !ready) return;
     if (entry.kind === 'meeting') {
       const date = new Date(`${entry.meetingDate}T${entry.meetingTime}:00`);
@@ -402,6 +445,31 @@ export default function QuickCapture({
       e.stopPropagation();
       return;
     }
+    if (actionMenuOpen) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setText('');
+        return;
+      }
+      if (['ArrowUp', 'ArrowDown', 'Enter', 'Tab'].includes(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!actions.length) return;
+        if (e.key === 'Enter' || e.key === 'Tab') chooseAction(action);
+        else {
+          const index = actions.indexOf(action);
+          setChoice(
+            'action:' +
+              actions[
+                (index + (e.key === 'ArrowDown' ? 1 : -1) + actions.length) %
+                  actions.length
+              ].id,
+          );
+        }
+        return;
+      }
+    }
     if (variant === 'desk' && e.key === 'Enter' && e.shiftKey) {
       e.stopPropagation();
       return;
@@ -457,10 +525,10 @@ export default function QuickCapture({
     autoComplete: 'off',
     'aria-label': 'Capture sentence',
     'aria-describedby': helpId,
-    'aria-expanded': menuOpen,
+    'aria-expanded': menuOpen || actionMenuOpen,
     onKeyDown: onWritingKey,
   };
-  if (entry.kind === 'project')
+  if (entry.kind === 'project' && slash === null)
     return (
       <ProjectCapture
         data={data}
@@ -471,10 +539,7 @@ export default function QuickCapture({
         drafts={drafts}
         draftKey={draftKey}
         sourceText={text || 'Create new project'}
-        initialName={entry.title.replace(
-          /^(?:create|start|new)\s+(?:a\s+)?(?:new\s+)?project\b\s*:?\s*/i,
-          '',
-        )}
+        initialName={stripEntryPrefix(entry.title, 'project')}
         initialSpace={entry.spaceId}
         initialDue={entry.due}
         back={() => {
@@ -504,7 +569,8 @@ export default function QuickCapture({
       className={
         'quick-capture' +
         (variant === 'desk' ? ' desk-composer' : '') +
-        (!text.trim() ? ' is-empty' : '')
+        (!text.trim() ? ' is-empty' : '') +
+        (actionMenuOpen ? ' is-choosing-action' : '')
       }
       aria-label="Capture notes, work, and updates"
       onSubmit={(e) => {
@@ -594,8 +660,14 @@ export default function QuickCapture({
             title="Enter to save. Shift+Enter for a new line. Use @ to connect a client, project, or date."
             rows={4}
             onChange={(e) => edit(e.target.value)}
-            placeholder="Start writing…"
-            aria-controls={menuOpen ? helpId + '-suggestions' : undefined}
+            placeholder="Write, or / for actions…"
+            aria-controls={
+              actionMenuOpen
+                ? helpId + '-actions'
+                : menuOpen
+                  ? helpId + '-suggestions'
+                  : undefined
+            }
           />
         ) : (
           <CommandInput
@@ -603,6 +675,30 @@ export default function QuickCapture({
             onValueChange={(value) => edit(value)}
             placeholder="Jot a note, a meeting, or what needs to happen…"
           />
+        )}
+        {actionMenuOpen && (
+          <CommandList
+            className="desk-action-menu"
+            id={helpId + '-actions'}
+            aria-label="Desk actions"
+          >
+            {actions.map((item) => (
+              <CommandItem
+                key={item.id}
+                value={'action:' + item.id}
+                onSelect={() => chooseAction(item)}
+              >
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>{item.example}</small>
+                </span>
+                <kbd>/{item.id}</kbd>
+              </CommandItem>
+            ))}
+            <CommandEmpty>
+              No matching action. Type /help for all actions.
+            </CommandEmpty>
+          </CommandList>
         )}
         {menuOpen && (
           <CommandList
@@ -672,7 +768,8 @@ export default function QuickCapture({
         'blocker',
         'status',
       ].includes(entry.kind) &&
-        text.trim() && (
+        text.trim() &&
+        !actionMenuOpen && (
           <div className="entry-routing">
             <div className="entry-route-copy">
               {variant !== 'desk' && <span>Will save to</span>}
@@ -707,11 +804,15 @@ export default function QuickCapture({
             >
               <SelectTrigger aria-label="Capture destination">
                 <SelectValue>
-                  {variant === 'desk'
-                    ? 'Change'
-                    : target
-                      ? 'Change destination'
-                      : 'Choose destination'}
+                  {(entry.kind === 'deadline' || update) &&
+                  !entry.taskId &&
+                  !entry.projectId
+                    ? 'Choose work'
+                    : variant === 'desk'
+                      ? 'Change'
+                      : target
+                        ? 'Change destination'
+                        : 'Choose destination'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -739,7 +840,45 @@ export default function QuickCapture({
             </Select>
           </div>
         )}
-      {entry.kind === 'meeting' && (
+      {entry.kind === 'deadline' && !actionMenuOpen && (
+        <div className="entry-deadline-field">
+          <label htmlFor={helpId + '-deadline'}>Deadline</label>
+          <Input
+            id={helpId + '-deadline'}
+            type="date"
+            value={entry.due}
+            onChange={(e) => setDeadlineDate(e.target.value)}
+          />
+        </div>
+      )}
+      {entry.kind === 'status' && !actionMenuOpen && (
+        <div className="entry-deadline-field">
+          <label htmlFor={helpId + '-status'}>Status</label>
+          <Select
+            value={entry.nextStage || ''}
+            onValueChange={(value) => {
+              if (!value) return;
+              setTarget(entry.target?.type === 'task' ? entry.target : null);
+              setPins([]);
+              setKind('status');
+              setText('Status: ' + value);
+              setAttempted(false);
+            }}
+          >
+            <SelectTrigger id={helpId + '-status'} aria-label="New task status">
+              <SelectValue>{entry.nextStage || 'Choose status'}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {['Up next', 'Doing', 'Review', 'Done'].map((stage) => (
+                <SelectItem key={stage} value={stage}>
+                  {stage}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {entry.kind === 'meeting' && !actionMenuOpen && (
         <div className="entry-meeting-fields">
           <label htmlFor={helpId + '-date'}>
             Meeting date
@@ -762,7 +901,7 @@ export default function QuickCapture({
           <span>Saved in the client’s meetings. No invitation is sent.</span>
         </div>
       )}
-      {sales ? (
+      {actionMenuOpen ? null : sales ? (
         <div className="sales-capture-preview">
           <div>
             <span>Prospect</span>
@@ -840,11 +979,14 @@ export default function QuickCapture({
           )}
         </div>
       ) : null}
-      {text.trim() && entry.errors.length > 0 && (
-        <p className="capture-error" role="alert">
-          {entry.errors[0]}
-        </p>
-      )}
+      {!actionMenuOpen &&
+        text.trim() &&
+        attempted &&
+        entry.errors.length > 0 && (
+          <p className="capture-error" role="alert">
+            {entry.errors[0]}
+          </p>
+        )}
       {error && (
         <p className="capture-error" role="alert">
           {error}

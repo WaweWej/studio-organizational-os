@@ -1,3 +1,4 @@
+import { matchEntryIntent, stripEntryPrefix } from './desk-intents';
 import type { Workspace, Task, Stage } from './model';
 import { parseCapture, type CaptureMention } from './task-capture';
 import { parseSalesCapture } from './sales-model';
@@ -39,21 +40,9 @@ export type EntryOptions = {
   focusTaskId?: string | null;
 };
 export function inferEntryKind(text: string): EntryKind {
-  if (/^\s*(?:create|start|new)\s+(?:a\s+)?(?:new\s+)?project\b/i.test(text))
-    return 'project';
-  if (
-    /^\s*(progress|update)\s*:/i.test(text) ||
-    /^\s*progress\s+["“]/i.test(text)
-  )
-    return 'progress';
-  if (/^\s*(blocked|blocker|unblocked)\b/i.test(text)) return 'blocker';
-  if (/^\s*(status\b|ready for review\b)/i.test(text)) return 'status';
-  if (/^\s*task\s*:/i.test(text)) return 'task';
+  const intent = matchEntryIntent(text);
+  if (intent) return intent.kind;
   if (/^\s*sales\s+meeting\s+with\b/i.test(text)) return 'sales';
-  if (/^\s*(note\b|meeting notes?\b|idea\b|decision\b)/i.test(text))
-    return 'note';
-  if (/^\s*(deadline\b|due date\b|reschedule\b)/i.test(text)) return 'deadline';
-  if (/^\s*(meeting\b|meet with\b)/i.test(text)) return 'meeting';
   if (
     /^\s*(task\s*:|book|edit|write|send|call|prepare|create|build|review|finish|update|check|calculate|plan|design|record|publish|schedule|follow up|confirm|fix|draft|research|add|make|connect|document|deliver|set up)\b/i.test(
       text,
@@ -72,6 +61,7 @@ export function interpretEntry(
       ? options.kind
       : inferEntryKind(text);
   const isUpdate = isTaskUpdate(kind);
+  const recognizedIntent = matchEntryIntent(text);
   const parsed = parseCapture(text, data, {
     projectId: options.projectId,
     pins: options.pins,
@@ -84,10 +74,16 @@ export function interpretEntry(
         e === 'Keep the task name under 180 characters.'
       ),
   );
+  if (
+    /^\s*\/[a-z-]+(?:\s|$)/i.test(text) &&
+    !recognizedIntent &&
+    (!options.kind || options.kind === 'auto')
+  )
+    errors.push(
+      'Choose an action from /, or write Note: to keep this as text.',
+    );
   const quoted = isUpdate
-    ? /^\s*(?:progress|update|blocked|blocker|unblocked|status|ready for review)\s+["“]([^"”]+)["”](?:\s*:|\s*$)/i.exec(
-        text,
-      )?.[1]
+    ? /^["“]([^"”]+)["”](?:\s*:|\s*$)/.exec(stripEntryPrefix(text, kind))?.[1]
     : /["“]([^"”]+)["”]/.exec(text)?.[1];
   let target = options.target || null;
   if (isUpdate && quoted) {
@@ -162,23 +158,28 @@ export function interpretEntry(
       : spaceId
         ? { type: 'space', id: spaceId }
         : null;
-  let title = parsed.title.replace(/^task\s*:\s*/i, '');
+  let title =
+    kind === 'task' ? stripEntryPrefix(parsed.title, 'task') : parsed.title;
+  if (kind === 'task' && !title) errors.push('Give the task a name.');
   let writing = text;
   for (const mention of [...parsed.mentions].sort((a, b) => b.start - a.start))
     writing = writing.slice(0, mention.start) + writing.slice(mention.end);
+  const rawWriting = writing;
   writing = writing.replace(/[ \t]+/g, ' ').trim();
-  let body = (kind === 'note' ? writing : title).replace(
-    /^(?:meeting notes?|note|idea|decision)\b(?:\s+(?:for|on))?\s*:?\s*/i,
-    '',
-  );
+  let body = kind === 'note' ? stripEntryPrefix(writing, 'note') : title;
+  const routingColon = text.indexOf(':');
   if (
     kind === 'note' &&
-    body.includes(':') &&
-    parsed.mentions.some(
-      (m) => m.kind !== 'date' && m.start < text.indexOf(':'),
-    )
-  )
-    body = body.slice(body.indexOf(':') + 1).trim();
+    parsed.mentions.some((m) => m.kind !== 'date' && m.end <= routingColon)
+  ) {
+    const removed = parsed.mentions
+      .filter((m) => m.end <= routingColon)
+      .reduce((total, m) => total + m.end - m.start, 0);
+    body = rawWriting
+      .slice(routingColon - removed + 1)
+      .replace(/[ \t]+/g, ' ')
+      .trim();
+  }
   if (kind === 'note') {
     if (!body) errors.push('Write the note you want to keep.');
     title = body.length > 90 ? body.slice(0, 87) + '…' : body;
@@ -233,15 +234,9 @@ export function interpretEntry(
   let clearBlocker = false;
   if (isUpdate) {
     if (!taskId) errors.push('Choose the task this update belongs to.');
-    const withoutTitle = quoted
-      ? writing.replace(/["“][^"”]+["”]/, '')
-      : writing;
-    body = withoutTitle
-      .replace(
-        /^(?:progress|update|blocked|blocker|unblocked|status|ready for review)\b\s*:?\s*/i,
-        '',
-      )
-      .replace(/^:\s*/, '')
+    const content = stripEntryPrefix(writing, kind);
+    body = (quoted ? content.replace(/^["“][^"”]+["”]/, '') : content)
+      .replace(/^\s*:\s*/, '')
       .trim();
     title = data.tasks.find((t) => t.id === taskId)?.title || 'Task update';
     if (parsed.due)
@@ -250,7 +245,7 @@ export function interpretEntry(
       );
     if (kind === 'progress' && !body) errors.push('Write what moved forward.');
     if (kind === 'blocker') {
-      clearBlocker = /^\s*unblocked\b/i.test(text);
+      clearBlocker = matchEntryIntent(text)?.id === 'unblock';
       if (!clearBlocker && !body)
         errors.push('Describe what is blocking this task.');
       if (body.length > 500)
@@ -258,9 +253,10 @@ export function interpretEntry(
       if (clearBlocker) body = body ? 'Unblocked: ' + body : 'Blocker cleared';
     }
     if (kind === 'status') {
-      const value = /^\s*ready for review\b/i.test(text)
-        ? 'review'
-        : body.toLowerCase().replace(/[.!]$/, '').trim();
+      const value =
+        matchEntryIntent(text)?.id === 'review'
+          ? 'review'
+          : body.toLowerCase().replace(/[.!]$/, '').trim();
       nextStage =
         (
           {

@@ -95,3 +95,11 @@ Progress, blocker and status captures update existing tasks. Task context is inh
 
 Validation: entry, task capture, sales/context and new Desk model/API suites pass. The new suite covers multiline context, routing conflicts, ambiguous identities, project/file persistence, upload byte integrity, retries/concurrency, stale updates, recipient deduplication, review guards and tenant isolation. TypeScript and focused lint pass. Temporary fixtures use exact-ID database cleanup and the exact generated R2 object key. No browser automation or screenshots were requested/performed; the provided screenshot guided the visual reduction.
 Final local production build passes (existing client-chunk size warning only). HTTP checks return 200 for Desk, Today, Sales and the workspace API. All generated database fixtures and the exact generated file object were removed; the user's workspace records remain intact. Local preview stays available at http://localhost:5173/?view=desk. No publishing or external source upload was performed.
+
+## Discoverable Desk actions · 9 September 2026
+
+Added a shared action registry for natural phrases and slash commands, including “add new deadline”, “schedule a meeting”, “log progress”, “flag a blocker”, “change status” and “request review”. `/` and `/help` show searchable actions and examples in the writing surface. Keyboard selection expands the canonical entry without saving anything. Full slash sentences are also accepted, including sales shorthand. Deadline entries expose a date picker and work target; status entries expose the new stage. Validation waits until a save attempt. Connected notes retain internal colons and paragraph breaks.
+
+The registry suite tests every advertised alias and slash action, command filtering, unknown commands, prefix removal and context preservation. Entry, capture, sales/context and full Desk API suites also pass, including file retries and review safeguards.
+
+Production build, TypeScript and focused lint pass for the action vocabulary. The Desk returns HTTP 200. Verification fixtures were cleaned up, and local preview remains running.

@@ -1212,3 +1212,77 @@
     animation: none;
   }
 }
+.desk-composer.is-choosing-action > footer,
+.desk-composer.is-choosing-action > header {
+  display: none;
+}
+.desk-action-menu {
+  margin-top: 12px;
+  border: 1px solid #e8ecf3;
+  border-radius: 10px;
+  padding: 5px;
+  max-height: 330px;
+  background: #fff;
+}
+.desk-action-menu [data-slot='command-item'] {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 13px;
+  border-radius: 6px;
+}
+.desk-action-menu [data-slot='command-item'] > span {
+  flex: 1;
+  min-width: 0;
+}
+.desk-action-menu strong {
+  font-size: 14px;
+  font-weight: 400;
+  color: #637791;
+}
+.desk-action-menu small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #98a8c0;
+  margin-top: 4px;
+}
+.desk-action-menu kbd {
+  font-size: 12px;
+  color: #a5b2c8;
+  background: transparent;
+}
+.desk-action-menu [data-slot='command-item'][data-selected='true'] {
+  background: #f3f6fb;
+}
+.entry-deadline-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  padding: 14px 0;
+  border-top: 1px solid #edf1f7;
+}
+.entry-deadline-field label {
+  font-size: 14px;
+  color: #7c8fab;
+}
+.entry-deadline-field input,
+.entry-deadline-field [data-slot='select-trigger'] {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #6f85a5;
+  font-size: 14px;
+  width: 190px;
+  padding: 0;
+}
+@media (max-width: 767px) {
+  .desk-action-menu kbd {
+    display: none;
+  }
+  .desk-action-menu {
+    max-height: 290px;
+  }
+}
