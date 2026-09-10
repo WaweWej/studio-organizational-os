@@ -103,3 +103,11 @@ Added a shared action registry for natural phrases and slash commands, including
 The registry suite tests every advertised alias and slash action, command filtering, unknown commands, prefix removal and context preservation. Entry, capture, sales/context and full Desk API suites also pass, including file retries and review safeguards.
 
 Production build, TypeScript and focused lint pass for the action vocabulary. The Desk returns HTTP 200. Verification fixtures were cleaned up, and local preview remains running.
+
+## Development across computers · 10 September 2026
+
+Prepared this standalone Studio repository for private GitHub synchronization. README documents fresh setup and switching branches/computers. AGENTS.md carries the current product direction, engineering boundaries and data handling into future Codex conversations. The original master prompt is now included in docs instead of relying on a file outside the repository. Product notes now identify Desk as the default surface. Node 24 is recorded in .nvmrc; npm commands cover local migrations, type checks and the standalone intent suite.
+
+Verification used an isolated copy of the tracked source and new documentation, with no copied dependencies or workspace data. A clean npm ci installed 582 packages; all seven local migrations applied; the production build passed with the existing client chunk warning. Its Desk and workspace API returned 200 and the expected 12 sample tasks / 5 sample projects. The temporary server was stopped. TypeScript, intent tests and documentation links also passed. The original workspace database and running preview were not changed.
+
+Git shares source and durable documentation only. Each independent clone has its own local sample data; it does not synchronize the original preview's user records, files, vault, browser drafts or Codex transcript. Codex Remote is documented for continuing the same conversation and host state. The CLI's remote-control start command reports that its daemon lifecycle is Unix-only, so Windows device pairing must be completed through the desktop app. This development setup does not deploy the Studio application or change its Sites access.

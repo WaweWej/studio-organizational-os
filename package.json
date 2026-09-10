@@ -11,7 +11,10 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "lint": "oxlint",
     "format": "oxfmt",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:local": "wrangler d1 migrations apply site-creator-d1 --local --persist-to .wrangler/state --config wrangler.local.jsonc",
+    "check": "tsc --noEmit",
+    "test:intents": "node --import ./tests/ts-loader.mjs tests/desk-intents.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
