@@ -6,13 +6,13 @@ The product and engineering context travels with this repository. Codex reads [A
 
 ## Online use and updates
 
-The live Studio site uses the existing private Sites project with persistent Cloudflare D1 data and R2 file storage. Sign in with the same ChatGPT account that owns the site. Local preview data is separate; the header labels it Local preview. Use the live URL for real work after the initial transfer.
+Open [Studio online](https://studio-organizational-os.gwej123.chatgpt.site) for real work. The live site uses the existing private Sites project with persistent Cloudflare D1 data and R2 file storage. Sign in with the same ChatGPT account that owns the site. Local preview data is separate; the header labels it Local preview.
 
 Publishing a new code version reuses the same site and database. Keep `.openai/hosting.json` and its project ID/binding names intact. Database changes use new, reviewed migrations; never reset the live database, replay sample seeds, or replace it with local test data. The pilot remains one owner; sharing the site does not yet create a shared multi-user organization.
 
 To make improvements, ask Codex to change Studio locally, verify the affected flow with isolated fixtures, then publish the update to the existing private site. GitHub stores the development source; Sites stores published versions. The deployment process applies pending schema migrations while retaining workspace records. Keep migrations compatible with already saved data.
 
-For a local backup run `python3 scripts/backup-workspace.py`. Backups and exports stay under ignored `work/`; never commit them. The one-time local-to-hosted transfer uses an authenticated, secret-gated endpoint and an atomic empty-target check. Its key is removed after the transfer. It is not part of ordinary updates. Files/vault records need a separately planned transfer; neither is present in the initial cutover.
+For a local backup, stop the preview and run `python3 scripts/backup-workspace.py`. Backups and exports stay under ignored `work/`; never commit them. The one-time local-to-hosted transfer uses an authenticated, secret-gated endpoint bound to the owner's workspace and an atomic empty-target check. Its key and target setting are removed after the transfer. It is not part of ordinary updates. Files/vault records need a separately planned transfer; neither is present in the initial cutover.
 
 ## Continue on another computer
 
