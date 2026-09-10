@@ -1,5 +1,9 @@
 # Vault and file storage design
 
+## Google Calendar connection
+
+See [GOOGLE_CALENDAR.md](GOOGLE_CALENDAR.md) for scopes, account boundaries, data flow and operation. Google OAuth is an optional account link behind existing Studio authentication. State requires the same authenticated organization/member and a short-lived HttpOnly browser cookie, is claimed once, and uses PKCE. Refresh tokens are AES-GCM encrypted with a separate Sites runtime secret and organization/member-bound associated data. Connection tables are excluded from workspace collections. Provider error bodies and tokens are not logged or returned to the browser. Google receives exported titles, schedules and Studio links, without meeting notes, attendees, task briefs, decisions or invitations. Disconnect removes the local refresh token; users can also revoke consent in Google Account settings. Private hosting is unchanged; no public webhook or scheduler has been introduced.
+
 ## Private hosting and initial transfer
 
 Production uses Sites owner-only access plus dispatch-authenticated user IDs. The development fallback remains compiled out of production. D1 and R2 are bound to the existing site across deployments; deployments contain code and schema migrations, never local workspace state or credentials.

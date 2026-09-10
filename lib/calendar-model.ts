@@ -2,6 +2,9 @@ import { taskSpaceId } from './task-context';
 import type { Workspace } from './model';
 
 export type DeadlineEntry = {
+  google?: boolean;
+  googleUrl?: string;
+  endDue?: string;
   key: string;
   kind: 'project' | 'task' | 'meeting' | 'event' | 'deadline';
   source?: 'calendar' | 'meeting';
@@ -31,6 +34,16 @@ export function dateKey(date: Date) {
 export function localDate(value: string) {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 12);
+}
+export function isoWeek(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  // ISO weeks start on Monday and belong to the year of their Thursday.
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  return Math.ceil(
+    ((date.getTime() - Date.UTC(date.getUTCFullYear(), 0, 1)) / 86400000 + 1) /
+      7,
+  );
 }
 export function monthKey(date: Date) {
   return dateKey(date).slice(0, 7);
@@ -113,6 +126,10 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
   }
   for (const meeting of data.meetings) {
     if (meeting.status === 'Cancelled') continue;
+    const google = data.calendarEvents?.find(
+      (e) => e.meetingId === meeting.id && e.googleEventId,
+    );
+    if (google && !googleVisible(data, google)) continue;
     const start = new Date(meeting.startsAt);
     if (Number.isNaN(start.getTime())) continue;
     const space = meeting.spaceId ? spaces.get(meeting.spaceId) : undefined;
@@ -136,10 +153,12 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
       stage: meeting.status,
       description: meeting.agenda,
       revision: meeting.revision,
+      ...(google ? googleFields(google) : {}),
     });
   }
   for (const event of data.calendarEvents || []) {
     if (event.archived || event.meetingId) continue;
+    if (event.googleEventId && !googleVisible(data, event)) continue;
     entries.push({
       key: 'calendar:' + event.id,
       id: event.id,
@@ -162,6 +181,7 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
             : 'Event',
       description: event.description,
       revision: event.revision,
+      ...(event.googleEventId ? googleFields(event) : {}),
     });
   }
   return entries.sort(deadlineOrder);
@@ -196,6 +216,8 @@ export function deadlineCommand(
   due: string,
   time = entry.time || '',
 ) {
+  if (entry.google)
+    throw new Error('Change this meeting’s schedule in Google Calendar.');
   if (entry.source === 'calendar')
     return {
       type: 'calendar-save',
@@ -238,4 +260,35 @@ export function deadlineCommand(
         dueTime: time,
       }
     : { type: 'project-deadline', id: entry.id, previous: entry.due, due };
+}
+
+function googleVisible(
+  data: Workspace,
+  event: NonNullable<Workspace['calendarEvents']>[number],
+) {
+  return (
+    !event.archived &&
+    !!data.googleCalendar?.connected &&
+    data.googleCalendar.selected.includes(event.googleCalendarId || '')
+  );
+}
+function googleFields(
+  event: NonNullable<Workspace['calendarEvents']>[number],
+): Partial<DeadlineEntry> {
+  const start = event.googleStart || event.date;
+  const end = event.googleEnd || event.date;
+  const allDay = start.length === 10;
+  const date = new Date(start),
+    last = new Date(Date.parse(end) - 1);
+  return {
+    google: true,
+    googleUrl: event.googleUrl,
+    due: allDay ? start : dateKey(date),
+    time: allDay
+      ? ''
+      : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`,
+    endDue: allDay
+      ? new Date(Date.parse(end) - 86400000).toISOString().slice(0, 10)
+      : dateKey(last),
+  };
 }

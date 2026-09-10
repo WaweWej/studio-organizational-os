@@ -1,5 +1,6 @@
 import type { CaptureEntry } from './entry-model';
 import type { Prospect, ProspectEvent } from './sales-model';
+import type { GoogleCalendarStatus } from './google-calendar-types';
 import type {
   Resource,
   ResourceLink,
@@ -126,6 +127,7 @@ export type Document = {
   body: string;
 };
 export type Workspace = {
+  googleCalendar?: GoogleCalendarStatus;
   environment?: 'local' | 'hosted';
   dailyPlans?: DailyPlan[];
   slackConnected?: boolean;
@@ -171,6 +173,11 @@ export type DailyPlan = {
   deliveryError: string;
 };
 export type CalendarEvent = {
+  googleCalendarId?: string;
+  googleEventId?: string;
+  googleUrl?: string;
+  googleStart?: string;
+  googleEnd?: string;
   id: string;
   meetingId?: string | null;
   title: string;

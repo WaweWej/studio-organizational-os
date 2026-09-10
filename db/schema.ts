@@ -122,6 +122,11 @@ export const calendarEvents = sqliteTable(
   {
     ...identity(),
     meetingId: text('meetingId'),
+    googleCalendarId: text('googleCalendarId').notNull().default(''),
+    googleEventId: text('googleEventId').notNull().default(''),
+    googleUrl: text('googleUrl').notNull().default(''),
+    googleStart: text('googleStart').notNull().default(''),
+    googleEnd: text('googleEnd').notNull().default(''),
     title: text('title').notNull(),
     kind: text('kind').notNull(),
     date: text('date').notNull(),
@@ -138,7 +143,57 @@ export const calendarEvents = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.org, t.id] }),
     index('calendar_by_date').on(t.org, t.date),
+    index('calendar_google_source').on(
+      t.org,
+      t.actor,
+      t.googleCalendarId,
+      t.googleEventId,
+    ),
   ],
+);
+
+export const googleConnections = sqliteTable(
+  'googleConnections',
+  {
+    org: text('org').notNull(),
+    actor: text('actor').notNull(),
+    token: text('token').notNull(),
+    account: text('account').notNull(),
+    calendarId: text('calendarId').notNull().default(''),
+    selected: text('selected').notNull().default('[]'),
+    timeZone: text('timeZone').notNull().default('UTC'),
+    status: text('status').notNull().default('connected'),
+    lastSync: text('lastSync').notNull().default(''),
+    error: text('error').notNull().default(''),
+    lease: text('lease').notNull().default(''),
+    leaseUntil: integer('leaseUntil').notNull().default(0),
+    createAttempt: integer('createAttempt').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.actor] })],
+);
+export const googleOAuthStates = sqliteTable(
+  'googleOAuthStates',
+  {
+    org: text('org').notNull(),
+    actor: text('actor').notNull(),
+    id: text('id').notNull(),
+    browserHash: text('browserHash').notNull(),
+    verifier: text('verifier').notNull(),
+    expires: integer('expires').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.actor, t.id] })],
+);
+export const googleExports = sqliteTable(
+  'googleExports',
+  {
+    org: text('org').notNull(),
+    actor: text('actor').notNull(),
+    sourceKey: text('sourceKey').notNull(),
+    calendarId: text('calendarId').notNull(),
+    eventId: text('eventId').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.actor, t.sourceKey] })],
 );
 
 export const calendarHistory = sqliteTable(

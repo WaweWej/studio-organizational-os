@@ -61,6 +61,8 @@ The existing computer's data is preserved. Use the same host through Remote if y
 
 ## Commands
 
+Google Calendar setup and sync behavior are documented in [docs/GOOGLE_CALENDAR.md](docs/GOOGLE_CALENDAR.md). Its credentials are private hosting settings; fresh clones do not connect to your real calendar.
+
 | Command | Purpose |
 | --- | --- |
 | `npm ci` | Install the exact locked dependencies |
@@ -81,4 +83,4 @@ The local development identity is not production authentication. Keep the previe
 - [Decisions](docs/DECISIONS.md)
 - [Security and data boundaries](docs/SECURITY.md)
 
-The pilot has one real owner. Sample records and colleagues were removed from the local workspace; synthetic fixtures remain available only to tests. Live AI, production third-party connectors, real team permissions and client sharing remain future work. The existing Sites registration is retained; a code push does not publish the app.
+The pilot has one real owner. Sample records and colleagues were removed; synthetic fixtures remain only in tests. Google Calendar has an account connection and sync flow; other production connectors, live AI, real team permissions and client sharing remain future work. The existing Sites registration is retained; a code push does not publish the app.

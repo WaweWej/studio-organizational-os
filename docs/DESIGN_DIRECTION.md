@@ -1,5 +1,11 @@
 # Studio: an organization that keeps its context
 
+## Google Calendar connection · 10 September 2026
+
+The calendar names both displayed ISO week numbers in the date heading and labels each week in the grid. The current week is marked explicitly; week numbers follow Monday-based ISO rules across year boundaries.
+
+Calendar owns Google account connection and source selection in a compact dialog. Preserve the 14-day layout. Imported entries are labeled Google, open their source for schedule editing, and use the canonical Studio meeting notes and client/prospect links. Studio work appears in a dedicated Google calendar. Editing remains with the source application. Never export notes or imply invitations were sent. Show the actual last successful sync, failures, and the limit that automatic refresh runs while Studio is open. Keep connection setup off the idle Desk. See GOOGLE_CALENDAR.md.
+
 ## Optional review and direct navigation · 10 September 2026
 
 Done completes any task immediately, including older tasks and tasks with a pending or previous review. Approval is never a prerequisite for completion. Review is an explicit request to another team member, selected when moving to Review or choosing Request review. A deliverable is optional; the current task brief can be reviewed. Requests create an in-app notification for that reviewer and retain version snapshots. Completion closes pending requests without manufacturing an approval or erasing previous decisions. No review-required switch appears during task capture or daily planning. The current owner-only pilot explains when no other reviewer is available.

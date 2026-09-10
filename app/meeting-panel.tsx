@@ -295,7 +295,13 @@ function PlanMeeting({
   );
   const [localError, setLocalError] = useState('');
   const available = (data.calendarEvents || []).filter(
-    (e) => e.kind === 'meeting' && !e.meetingId && !e.archived,
+    (e) =>
+      e.kind === 'meeting' &&
+      !e.meetingId &&
+      !e.archived &&
+      (!e.googleEventId ||
+        (data.googleCalendar?.connected &&
+          data.googleCalendar.selected.includes(e.googleCalendarId || ''))),
   );
   const event = available.find((e) => e.id === source);
   useEffect(() => {
@@ -351,8 +357,15 @@ function PlanMeeting({
               type: 'meeting-plan',
               id,
               ...meetingConnection(connection),
-              title,
-              startsAt: meetingStartsAt(day, time),
+              title: event?.googleEventId ? event.title : title,
+              startsAt:
+                event?.googleEventId && event.googleStart
+                  ? new Date(
+                      event.googleStart.includes('T')
+                        ? event.googleStart
+                        : event.date + 'T12:00:00Z',
+                    ).toISOString()
+                  : meetingStartsAt(day, time),
               notes,
               participants,
               calendarId: event?.id,
@@ -423,6 +436,7 @@ function PlanMeeting({
           Meeting title
           <Input
             id={controlId + '-title'}
+            readOnly={!!event?.googleEventId}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
@@ -434,6 +448,7 @@ function PlanMeeting({
             Date
             <Input
               id={controlId + '-day'}
+              readOnly={!!event?.googleEventId}
               type="date"
               value={day}
               onChange={(e) => setDay(e.target.value)}
@@ -444,6 +459,7 @@ function PlanMeeting({
             Time
             <Input
               id={controlId + '-time'}
+              readOnly={!!event?.googleEventId}
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}

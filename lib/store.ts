@@ -1,4 +1,6 @@
 import { changeDayWork } from './day-work-store';
+import { googleStatus } from './google-calendar-sync';
+import type { GoogleConfig } from './google-calendar-auth';
 import { mutateClientLifecycle } from './client-lifecycle-store';
 import { mutateProjectCapture } from './project-capture-store';
 import { blockerRecipients, type CaptureEntry } from './entry-model';
@@ -177,10 +179,11 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
       })),
   );
   const allTasks = out.tasks as Task[];
+  out.googleCalendar = await googleStatus(c, env as unknown as GoogleConfig);
   out.slackConnected = !!slackUrl(env as unknown as SlackConfig, c.org);
   out.calendarEvents = (
     out.calendarEvents as NonNullable<Workspace['calendarEvents']>
-  ).filter((e) => !e.archived);
+  ).filter((e) => (!e.archived || e.googleEventId) && (!e.googleEventId || e.actor === c.actor));
   out.tasks = allTasks.filter((t) => !t.archived);
   out.archivedTasks = allTasks.filter((t) => t.archived);
   const activeIds = new Set((out.tasks as Task[]).map((t) => t.id));

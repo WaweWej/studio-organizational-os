@@ -246,13 +246,24 @@ export async function mutateMeeting(
         .prepare('SELECT * FROM calendarEvents WHERE org=? AND id=?')
         .bind(c.org, calendarId)
         .first<CalendarEvent>();
-      if (!event || event.kind !== 'meeting' || event.archived)
+      if (
+        !event ||
+        event.kind !== 'meeting' ||
+        event.archived ||
+        (event.googleEventId && event.actor !== c.actor)
+      )
         throw new AppError('Calendar meeting not found.', 404);
       if (event.meetingId || event.revision !== calendarRevision)
         throw new AppError(
           'This calendar meeting changed. Reopen it to refresh.',
           409,
         );
+      if (event.googleEventId) {
+        fields.title = event.title;
+        fields.startsAt = event.googleStart?.includes('T')
+          ? new Date(event.googleStart).toISOString()
+          : new Date(event.date + 'T12:00:00Z').toISOString();
+      }
     }
     // Resolve the client inside the batch as well, in case conversion committed
     // after validation. Exact scoped references are required for every insert.
@@ -394,6 +405,24 @@ export async function mutateMeeting(
     ),
     status,
   };
+  const googleSource = await c.db
+    .prepare(
+      "SELECT actor FROM calendarEvents WHERE org=? AND meetingId=? AND googleEventId<>''",
+    )
+    .bind(c.org, id)
+    .first<{ actor: string }>();
+  if (
+    googleSource &&
+    (googleSource.actor !== c.actor ||
+      fields.title !== meeting.title ||
+      fields.startsAt !== meeting.startsAt ||
+      ((fields.status === 'Cancelled' || meeting.status === 'Cancelled') &&
+        fields.status !== meeting.status))
+  )
+    throw new AppError(
+      'Change this meeting’s title or schedule in Google Calendar. You can save notes and decisions here.',
+      409,
+    );
   // A previously unconnected meeting may be attached explicitly. Existing
   // relationships are immutable here; client conversion owns that transition.
   const attaching =

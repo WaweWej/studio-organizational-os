@@ -16,7 +16,7 @@ The Desk is a minimal white writing surface and the default destination. Writing
 
 Client spaces and the client overview feel like branded editorial websites within consistent navigation. Tasks, projects, clients, meetings, sales, assets, templates, tools and process records share canonical records and links. Do not duplicate a task for each view. Preserve versioned review, optimistic revisions, atomic history, retry deduplication and organization scoping.
 
-The present interpreter is deterministic; no live AI provider or production Slack/Monday/Google/InSMS connection is configured. Future AI must use the same validated command boundary. Never imply a connection, monitoring signal, delivery or invitation exists without evidence. Workspaces start empty with only the owner; do not seed sample colleagues or content. Real multi-user organization access remains future work.
+The present interpreter is deterministic; no live AI provider or production Slack/Monday/InSMS connection is configured. Google Calendar has an optional account connection: read docs/GOOGLE_CALENDAR.md and inspect the actual connection status before claiming it is active. Future AI must use the same validated command boundary. Never imply a connection, monitoring signal, delivery or invitation exists without evidence. Workspaces start empty with only the owner; do not seed sample colleagues or content. Real multi-user organization access remains future work.
 
 ## Engineering
 

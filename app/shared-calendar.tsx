@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- Day drop targets have an equivalent keyboard-accessible date editor on every entry. */
 import {
+  Fragment,
   useEffect,
   useState,
   type CSSProperties,
@@ -36,6 +37,7 @@ import {
   dateKey,
   deadlineCommand,
   filterDeadlines,
+  isoWeek,
   localDate,
   type DeadlineEntry,
 } from '@/lib/calendar-model';
@@ -45,8 +47,10 @@ import {
   meetingStartsAt,
 } from './meeting-connection';
 import type { Workspace } from '@/lib/model';
+import { GoogleCalendarControl } from './google-calendar';
 
 type Props = {
+  refresh: () => Promise<void>;
   data: Workspace;
   ready: boolean;
   busy: boolean;
@@ -109,6 +113,7 @@ function Choice({
   );
 }
 export default function SharedCalendar({
+  refresh,
   data,
   ready,
   busy,
@@ -186,10 +191,18 @@ export default function SharedCalendar({
         <div>
           <h1>Calendar</h1>
           <p>
+            <strong>
+              Weeks {isoWeek(start)} &amp; {isoWeek(days[7])}
+            </strong>
+            {' · '}
             {label(start)} — {label(days[13])}
           </p>
         </div>
         <div className="fc-controls">
+          <GoogleCalendarControl
+            status={data.googleCalendar}
+            refresh={refresh}
+          />
           <Button
             variant="ghost"
             size="icon"
@@ -282,88 +295,105 @@ export default function SharedCalendar({
         )}
       </div>
       <div className="fc-grid" aria-label="14-day calendar">
-        {days.map((day) => {
-          const items = entries.filter((e) => e.due === day),
+        {days.map((day, index) => {
+          const items = entries.filter(
+              (e) =>
+                e.due === day ||
+                (e.google && e.due < day && e.endDue && e.endDue >= day),
+            ),
             date = localDate(day);
           return (
-            <section
-              key={day}
-              aria-label={label(day)}
-              className={
-                'fc-day' +
-                (day === today ? ' fc-today' : '') +
-                ([0, 6].includes(date.getDay()) ? ' fc-weekend' : '')
-              }
-              onDragOver={(e) => {
-                if (!disabled && e.dataTransfer.types.includes(dragType)) {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = 'move';
-                }
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragged && e.dataTransfer.getData(dragType) === dragged.key)
-                  void move(dragged, day);
-                setDragged(null);
-              }}
-            >
-              <header>
-                <div>
-                  <span>
-                    {date.toLocaleDateString('en-GB', { weekday: 'short' })}
-                  </span>
-                  <strong>{date.getDate()}</strong>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  disabled={disabled}
-                  aria-label={'Add to ' + label(day)}
-                  onClick={() => add(day)}
-                >
-                  <Plus size={16} />
-                </Button>
-              </header>
-              <div className="fc-day-entries">
-                {items.map((entry) => (
-                  <button
-                    key={entry.key}
-                    className={
-                      'fc-entry' + (entry.complete ? ' fc-complete' : '')
-                    }
-                    style={{ '--entry-color': entry.color } as CSSProperties}
-                    onClick={() => {
-                      setFeedback('');
-                      setSelection({ ...entry });
-                    }}
-                    draggable={!disabled}
-                    onDragStart={(e) => {
-                      setDragged(entry);
-                      e.dataTransfer.setData(dragType, entry.key);
-                      e.dataTransfer.effectAllowed = 'move';
-                    }}
-                    onDragEnd={() => setDragged(null)}
-                  >
-                    <span className="fc-entry-time">
-                      {entry.time || 'All day'} · {kindLabel(entry)}
-                    </span>
-                    <strong>{entry.title}</strong>
-                    {(entry.spaceId || entry.prospectId) && (
-                      <small>{entry.client}</small>
-                    )}
-                  </button>
-                ))}
-              </div>
-              {!items.length && (
-                <button
-                  className="fc-add-empty"
-                  disabled={disabled}
-                  onClick={() => add(day)}
-                >
-                  + Add something
-                </button>
+            <Fragment key={day}>
+              {index % 7 === 0 && (
+                <h2 className="fc-week-label">
+                  Week {isoWeek(day)}
+                  {today >= day && today <= days[index + 6] && (
+                    <span>This week</span>
+                  )}
+                </h2>
               )}
-            </section>
+              <section
+                aria-label={label(day)}
+                className={
+                  'fc-day' +
+                  (day === today ? ' fc-today' : '') +
+                  ([0, 6].includes(date.getDay()) ? ' fc-weekend' : '')
+                }
+                onDragOver={(e) => {
+                  if (!disabled && e.dataTransfer.types.includes(dragType)) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (
+                    dragged &&
+                    e.dataTransfer.getData(dragType) === dragged.key
+                  )
+                    void move(dragged, day);
+                  setDragged(null);
+                }}
+              >
+                <header>
+                  <div>
+                    <span>
+                      {date.toLocaleDateString('en-GB', { weekday: 'short' })}
+                    </span>
+                    <strong>{date.getDate()}</strong>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    disabled={disabled}
+                    aria-label={'Add to ' + label(day)}
+                    onClick={() => add(day)}
+                  >
+                    <Plus size={16} />
+                  </Button>
+                </header>
+                <div className="fc-day-entries">
+                  {items.map((entry) => (
+                    <button
+                      key={entry.key}
+                      className={
+                        'fc-entry' + (entry.complete ? ' fc-complete' : '')
+                      }
+                      style={{ '--entry-color': entry.color } as CSSProperties}
+                      onClick={() => {
+                        setFeedback('');
+                        setSelection({ ...entry });
+                      }}
+                      draggable={!disabled && !entry.google}
+                      onDragStart={(e) => {
+                        setDragged(entry);
+                        e.dataTransfer.setData(dragType, entry.key);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onDragEnd={() => setDragged(null)}
+                    >
+                      <span className="fc-entry-time">
+                        {entry.time || 'All day'} ·{' '}
+                        {entry.google ? 'Google' : kindLabel(entry)}
+                      </span>
+                      <strong>{entry.title}</strong>
+                      {(entry.spaceId || entry.prospectId) && (
+                        <small>{entry.client}</small>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {!items.length && (
+                  <button
+                    className="fc-add-empty"
+                    disabled={disabled}
+                    onClick={() => add(day)}
+                  >
+                    + Add something
+                  </button>
+                )}
+              </section>
+            </Fragment>
           );
         })}
       </div>
@@ -445,7 +475,21 @@ export default function SharedCalendar({
               {selection?.spaceId ? ' · ' + selection.client : ''}
             </DialogDescription>
           </DialogHeader>
-          {selection && (
+          {selection?.google && (
+            <>
+              <p>{selection.description}</p>
+              {selection.googleUrl && (
+                <a
+                  href={selection.googleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open in Google Calendar
+                </a>
+              )}
+            </>
+          )}
+          {selection && !selection.google && (
             <CalendarForm
               key={selection.key}
               data={data}
@@ -485,46 +529,46 @@ export default function SharedCalendar({
               Open meeting notes
             </Button>
           )}
-          {selection?.source === 'calendar' ? (
-            <Button
-              variant="ghost"
-              disabled={disabled}
-              onClick={async () => {
-                if (
-                  await act({
-                    type: 'calendar-remove',
-                    id: selection.id,
-                    revision: selection.revision,
-                  })
-                ) {
-                  setSelection(null);
-                  setUndo(null);
-                }
-              }}
-            >
-              Remove from calendar
-            </Button>
-          ) : (
-            selection && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (selection.kind === 'task') openTask(selection.id);
-                  else if (selection.kind === 'project')
-                    openProject(selection.id);
-                  else if (selection.source === 'meeting')
-                    openMeeting(selection.id);
-                  else if (selection.spaceId) openSpace(selection.spaceId);
-                  setSelection(null);
-                }}
-              >
-                Open{' '}
-                {selection.kind === 'meeting'
-                  ? 'meeting notes'
-                  : selection.kind}
-              </Button>
-            )
-          )}
+          {selection?.source === 'calendar'
+            ? !selection.google && (
+                <Button
+                  variant="ghost"
+                  disabled={disabled}
+                  onClick={async () => {
+                    if (
+                      await act({
+                        type: 'calendar-remove',
+                        id: selection.id,
+                        revision: selection.revision,
+                      })
+                    ) {
+                      setSelection(null);
+                      setUndo(null);
+                    }
+                  }}
+                >
+                  Remove from calendar
+                </Button>
+              )
+            : selection && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (selection.kind === 'task') openTask(selection.id);
+                    else if (selection.kind === 'project')
+                      openProject(selection.id);
+                    else if (selection.source === 'meeting')
+                      openMeeting(selection.id);
+                    else if (selection.spaceId) openSpace(selection.spaceId);
+                    setSelection(null);
+                  }}
+                >
+                  Open{' '}
+                  {selection.kind === 'meeting'
+                    ? 'meeting notes'
+                    : selection.kind}
+                </Button>
+              )}
         </DialogContent>
       </Dialog>
       <Dialog open={!!list} onOpenChange={(open) => !open && setList(null)}>

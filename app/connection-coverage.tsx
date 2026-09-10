@@ -47,10 +47,7 @@ export default function ConnectionCoverage({
       </section>
       <section className="coverage-sources">
         <h2>External sources</h2>
-        <p>
-          These channels are part of the intended workspace. Connection setup
-          and synchronization are still to be built.
-        </p>
+        <p>Connection status comes from the saved workspace settings.</p>
         {[
           ['Monday', 'Existing boards, lead records, and automations'],
           ['Slack', 'Team updates, decisions, and review notifications'],
@@ -64,7 +61,17 @@ export default function ConnectionCoverage({
               <strong>{name}</strong>
               <small>{purpose}</small>
             </span>
-            <span>Not connected</span>
+            <span>
+              {name === 'Google Calendar'
+                ? data.googleCalendar?.connected
+                  ? data.googleCalendar.error
+                    ? 'Needs attention'
+                    : 'Connected'
+                  : 'Connect in Calendar'
+                : name === 'Slack' && data.slackConnected
+                  ? 'Connected'
+                  : 'Not connected'}
+            </span>
           </div>
         ))}
       </section>

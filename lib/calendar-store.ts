@@ -34,6 +34,11 @@ export async function mutateCalendar(
     .prepare('SELECT * FROM calendarEvents WHERE org=? AND id=?')
     .bind(c.org, id)
     .first<CalendarEvent & { fingerprint: string }>();
+  if (existing?.googleEventId)
+    throw new AppError(
+      'Edit this meeting in Google Calendar. Studio keeps its notes and connections.',
+      409,
+    );
   if (existing?.meetingId)
     throw new AppError(
       'Open the linked meeting to change its notes or schedule.',

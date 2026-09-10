@@ -1580,6 +1580,9 @@ export function MeetingEditor({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const draftScope = data.draftScope || '';
+  const googleSource = data.calendarEvents?.find(
+    (event) => event.meetingId === meeting.id && event.googleEventId,
+  );
   const [draft, setDraft] = useState(
     () => readMeetingDraft(draftScope, meeting) || { ...meeting },
   );
@@ -1686,6 +1689,7 @@ export function MeetingEditor({
         <div className="cf-form">
           <Field label="Meeting title">
             <Input
+              readOnly={!!googleSource}
               value={draft.title}
               onChange={(e) => update('title', e.target.value)}
               maxLength={180}
@@ -1694,6 +1698,7 @@ export function MeetingEditor({
           <Field label="Date & time">
             <Input
               type="datetime-local"
+              readOnly={!!googleSource}
               value={localInputTime(draft.startsAt)}
               onChange={(e) => {
                 if (e.target.value && !Number.isNaN(Date.parse(e.target.value)))
@@ -1702,7 +1707,21 @@ export function MeetingEditor({
             />
           </Field>
           <p className="cf-form-hint">
-            Your local time. Calendar sync is not connected.
+            {googleSource
+              ? 'The schedule is managed in Google Calendar. Notes stay here.'
+              : 'Your local time.'}
+            {googleSource?.googleUrl && (
+              <>
+                {' '}
+                <a
+                  href={googleSource.googleUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open in Google Calendar
+                </a>
+              </>
+            )}
           </p>
           <Field label="On the agenda">
             <Textarea
@@ -1865,7 +1884,7 @@ export function MeetingEditor({
           <output>
             {dirty ? 'Unsaved changes' : savedMessage || 'All changes saved'}
           </output>
-          {draft.status === 'Planned' && (
+          {draft.status === 'Planned' && !googleSource && (
             <button
               className="cf-cancel-meeting"
               onClick={() => void save('Cancelled')}
@@ -1896,15 +1915,16 @@ export function MeetingEditor({
               Complete meeting
             </Button>
           )}
-          {draft.status !== 'Planned' && (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => void save('Planned')}
-            >
-              Reopen meeting
-            </Button>
-          )}
+          {draft.status !== 'Planned' &&
+            !(googleSource && draft.status === 'Cancelled') && (
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void save('Planned')}
+              >
+                Reopen meeting
+              </Button>
+            )}
         </div>
       </div>
     </div>

@@ -1,5 +1,15 @@
 # Studio implementation status
 
+## Google Calendar import/export · 10 September 2026
+
+Added a private Google account connection in Calendar, scoped calendar selection, a dedicated Studio calendar for outbound meetings/deadlines, and automatic refresh while the visible app is open and after saved changes. Sync now, actual last-sync time, errors and disconnect are available. Google-origin meetings open the existing notes pathway; schedule changes/cancellations retain notes, decisions, task/client/prospect connections and history. Editing stays in the originating app; internal notes and attendees are not exported. See GOOGLE_CALENDAR.md for exact boundaries, rolling-window limits and configuration.
+
+Google Cloud Studio OS project and Web OAuth client are configured with the user-approved homeymedia.dk Internal audience. Google credentials and token encryption key are private Sites runtime settings. Migration 0016 is additive, generated from schema and applied locally after an ignored backup. Prior migrations and live data are untouched by local verification.
+
+The 14-day Calendar names both ISO week numbers in its heading and labels each week in the grid, including a current-week marker.
+
+Isolated SQLite and mocked-provider tests pass for OAuth state/browser/org/replay isolation, encrypted tokens, pagination, recurring instances, cancelled/declined entries, meeting-note preservation, transactional rollback, canonical provenance, date/time zones, export retries, completion cleanup, restoration IDs and sync leases. Existing calendar, meeting-notes, sales conversion and optional-review suites and Desk intent checks pass. TypeScript, focused lint and the production build pass (existing client chunk warning); the local Calendar route returns HTTP 200. Production publication and real-account sync verification are recorded after completion below.
+
 ## Optional reviews and separate Calendar / Projects · 10 September 2026
 
 Published privately as version 4, source `4bc34fa37795d67c76b71364e24e48548c92313f`, successful deployment `appgdep_6aa2aaad34648191aae7a6f1afbd1a5c`. Existing DB/ASSETS bindings and all applied migrations are unchanged.

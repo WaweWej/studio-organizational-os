@@ -21,6 +21,7 @@ import ReviewRequest from './review-request';
 import QuickCapture, { type CaptureDraft } from './quick-capture';
 import ClientDirectory from './client-directory';
 import SharedCalendar from './shared-calendar';
+import { useGoogleCalendarSync } from './google-calendar';
 import ResourceLibrary, {
   ResourceProvider,
   RelatedResources,
@@ -216,6 +217,7 @@ export default function Studio() {
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
   }, [refresh]);
+  useGoogleCalendarSync(ready && !!data.googleCalendar?.connected && data.googleCalendar.status !== 'reconnect', refresh);
   useEffect(() => {
     const timer = setInterval(() => {
       if (!selected && !busy && !create) refresh().catch(() => {});
@@ -357,6 +359,7 @@ export default function Studio() {
         throw new Error(body.error || 'The change could not be saved.');
       setData(body);
       setMessage('Saved to your workspace');
+      window.dispatchEvent(new Event('studio-work-saved'));
       return true;
     } catch (e) {
       setError(
@@ -892,6 +895,7 @@ export default function Studio() {
             )}
             {page === 'calendar' && (
               <SharedCalendar
+                refresh={refresh}
                 data={data}
                 ready={ready}
                 busy={busy}
