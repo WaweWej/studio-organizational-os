@@ -1,7 +1,9 @@
+import { convertProspect } from './sales-conversion-store';
+import { changeSalesStage } from './sales-stage-store';
 import { captureInsert } from './entry-store';
 import type { Context } from './store';
-import { AppError, textValue, revisionValue, dateValue } from './validation';
-import { parseSalesCapture, salesStages, type Prospect } from './sales-model';
+import { AppError, textValue, dateValue } from './validation';
+import { parseSalesCapture } from './sales-model';
 
 export async function mutateSales(c: Context, input: Record<string, unknown>) {
   const now = new Date().toISOString();
@@ -135,51 +137,12 @@ export async function mutateSales(c: Context, input: Record<string, unknown>) {
     }
     return;
   }
+  if (input.type === 'sales-convert') {
+    await convertProspect(c, input);
+    return;
+  }
   if (input.type === 'sales-stage') {
-    const id = textValue(input.id, 'Prospect', 100, true);
-    const revision = revisionValue(input.revision);
-    const stage = textValue(input.stage, 'Pipeline stage', 30, true);
-    if (!salesStages.includes(stage as (typeof salesStages)[number]))
-      throw new AppError('Choose a valid pipeline stage.');
-    const prospect = await c.db
-      .prepare('SELECT * FROM prospects WHERE org=? AND id=?')
-      .bind(c.org, id)
-      .first<Prospect>();
-    if (!prospect) throw new AppError('Prospect not found.', 404);
-    if (prospect.revision !== revision)
-      throw new AppError(
-        'This prospect has changed. Refresh before updating it.',
-        409,
-      );
-    if (prospect.stage === stage) return;
-    const result = await c.db.batch([
-      c.db
-        .prepare(
-          'UPDATE prospects SET stage=?,revision=revision+1,updatedAt=?,lastMutation=? WHERE org=? AND id=? AND revision=?',
-        )
-        .bind(stage, now, nonce, c.org, id, revision),
-      c.db
-        .prepare(`INSERT INTO prospectEvents (org,id,prospectId,taskId,body,kind,actor,createdAt,fingerprint,lastMutation)
-        SELECT ?,?,?,NULL,?,'stage',?,?,?,? WHERE EXISTS (SELECT 1 FROM prospects WHERE org=? AND id=? AND lastMutation=?)`)
-        .bind(
-          c.org,
-          crypto.randomUUID(),
-          id,
-          `Moved from ${prospect.stage} to ${stage}`,
-          c.actor,
-          now,
-          '',
-          nonce,
-          c.org,
-          id,
-          nonce,
-        ),
-    ]);
-    if (!result[0].meta.changes)
-      throw new AppError(
-        'This prospect has changed. Refresh before updating it.',
-        409,
-      );
+    await changeSalesStage(c, input);
     return;
   }
   throw new AppError('Unknown sales action.');

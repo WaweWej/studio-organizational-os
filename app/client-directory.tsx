@@ -15,13 +15,7 @@ export default function ClientDirectory({
   openSpace: (id: string) => void;
 }) {
   const [filter, setFilter] = useState('all');
-  const ordered = [...data.spaces].sort((a, b) => {
-    const rank = (id: string) =>
-      ['nord', 'harbor', 'juniper'].includes(id)
-        ? ['nord', 'harbor', 'juniper'].indexOf(id)
-        : 10 + data.spaces.findIndex((s) => s.id === id);
-    return rank(a.id) - rank(b.id);
-  });
+  const ordered = [...data.spaces].sort((a, b) => a.name.localeCompare(b.name));
   const spaces = ordered.filter(
     (s) =>
       filter === 'all' ||
@@ -29,22 +23,9 @@ export default function ClientDirectory({
   );
   return (
     <div className="client-directory">
-      <div className="cd-edition">
-        <span>STUDIO / THE CLIENT JOURNAL</span>
-        <span>{data.demo ? 'SAMPLE COLLECTION' : 'OUR COLLECTIVE WORK'}</span>
-      </div>
-      <header className="cd-masthead">
-        <div>
-          <h1>
-            Good <em>company.</em>
-            <sup>{String(data.spaces.length).padStart(2, '0')}</sup>
-          </h1>
-          <p>The brands we build. The worlds we work in.</p>
-        </div>
-        <span className="cd-masthead-note">
-          A home for every story.
-          <br />A place to move it forward.
-        </span>
+      <header className="spaces-heading">
+        <h1>Spaces</h1>
+        <span>{data.spaces.length}</span>
       </header>
       <div className="cd-index-bar">
         <Tabs value={filter} onValueChange={(v) => setFilter(String(v))}>
@@ -54,10 +35,16 @@ export default function ClientDirectory({
             <TabsTrigger value="owned">Our own platforms</TabsTrigger>
           </TabsList>
         </Tabs>
-        <span>
-          {String(spaces.length).padStart(2, '0')} SPACES / EXPLORE THE INDEX
-        </span>
       </div>
+      {!spaces.length && (
+        <p className="spaces-empty">
+          {filter === 'owned'
+            ? 'No platforms yet.'
+            : filter === 'clients'
+              ? 'No clients yet.'
+              : 'No spaces yet.'}
+        </p>
+      )}
       <div className="cd-grid">
         {spaces.map((space, index) => {
           const projects = data.projects.filter((p) => p.spaceId === space.id);
@@ -92,12 +79,7 @@ export default function ClientDirectory({
                 <div className="cd-story-wordmark">
                   {space.logoUrl && <img src={space.logoUrl} alt="" />}
                   <h2>{space.name}</h2>
-                  <p>
-                    {space.tagline ||
-                      (space.type === 'Owned platform'
-                        ? 'Our ideas. Out in the world.'
-                        : 'The next chapter starts here.')}
-                  </p>
+                  {space.tagline && <p>{space.tagline}</p>}
                 </div>
                 <span className="cd-enter">
                   <ArrowUpRight size={24} />
@@ -133,11 +115,6 @@ export default function ClientDirectory({
           );
         })}
       </div>
-      <footer className="cd-colophon">
-        <strong>studio.</strong>
-        <span>Different worlds. One shared workspace.</span>
-        <span>END OF INDEX / {String(spaces.length).padStart(2, '0')}</span>
-      </footer>
     </div>
   );
 }

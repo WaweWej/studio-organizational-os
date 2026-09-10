@@ -1,5 +1,6 @@
 'use client';
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- Native drag/drop has the equivalent keyboard-accessible Sales stage select in each prospect workspace. */
+import ProspectClientForm from './prospect-client-form';
 import { useState } from 'react';
 import {
   ArrowUpRight,
@@ -38,6 +39,9 @@ export default function SalesPipeline({
   capture,
   act,
   openTask,
+  openClient,
+  openMeeting,
+  planMeeting,
 }: {
   data: Workspace;
   ready: boolean;
@@ -48,11 +52,19 @@ export default function SalesPipeline({
   capture: (text?: string) => void;
   act: (v: Record<string, unknown>) => Promise<boolean>;
   openTask: (id: string) => void;
+  openClient: (id: string) => void;
+  openMeeting: (id: string) => void;
+  planMeeting: (prospectId?: string) => void;
 }) {
+  const [created, setCreated] = useState<string | null>(null);
+  const createdClient = data.prospects.find((p) => p.id === created)?.clientId;
+  const [converting, setConverting] = useState<string | null>(null);
+  const pipeline = data.prospects.filter((p) => !p.convertedAt);
+  const conversion = pipeline.find((p) => p.id === converting);
   const [closed, setClosed] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
-  const prospect = data.prospects.find((p) => p.id === selected);
-  const stages = closed ? salesStages.slice(4) : salesStages.slice(0, 4);
+  const prospect = pipeline.find((p) => p.id === selected);
+  const stages = closed ? salesStages.slice(4) : salesStages;
   const move = (p: Prospect, stage: SalesStage) =>
     void act({ type: 'sales-stage', id: p.id, revision: p.revision, stage });
   const example = 'Sales meeting with "", next step: ';
@@ -61,47 +73,44 @@ export default function SalesPipeline({
       <header className="desk-heading">
         <div>
           <p className="os-overline">Sales / Prospects</p>
-          <h1>Every conversation leads somewhere.</h1>
-          <p>The relationship, the history, and a clear next step.</p>
+          <h1>Sales</h1>
         </div>
-        <button
-          className="os-button"
-          onClick={() => capture(example)}
-          disabled={!ready}
-        >
-          <Plus size={16} /> Record a conversation
-        </button>
+        <div className="sales-header-actions">
+          <button
+            className="os-button"
+            disabled={!ready}
+            onClick={() => planMeeting()}
+          >
+            <MessageSquare size={16} /> Meeting notes
+          </button>
+          <button
+            className="os-button"
+            onClick={() => capture(example)}
+            disabled={!ready}
+          >
+            <Plus size={16} /> Record a conversation
+          </button>
+        </div>
       </header>
-      <button
-        className="sales-capture-invitation"
-        onClick={() => capture(example)}
-        disabled={!ready}
-      >
-        <MessageSquare size={20} />
-        <span>
-          <strong>
-            Sales meeting with “a new name”, next step: calculate lead price
-          </strong>
-          <small>
-            One sentence records the conversation, finds or creates the
-            prospect, and connects a task.
-          </small>
-        </span>
-        <ArrowRight size={19} />
-      </button>
+
+      {createdClient && (
+        <output>
+          Client record created.{' '}
+          <button
+            className="os-button"
+            onClick={() => openClient(createdClient)}
+          >
+            Open client space <ArrowUpRight size={15} />
+          </button>
+        </output>
+      )}
       <div className="sales-toolbar">
         <div>
           <button
             className={!closed ? 'active' : ''}
             onClick={() => setClosed(false)}
           >
-            Open pipeline{' '}
-            <span>
-              {
-                data.prospects.filter((p) => !['Won', 'Lost'].includes(p.stage))
-                  .length
-              }
-            </span>
+            Full pipeline <span>{pipeline.length}</span>
           </button>
           <button
             className={closed ? 'active' : ''}
@@ -109,21 +118,23 @@ export default function SalesPipeline({
           >
             Won & lost{' '}
             <span>
-              {
-                data.prospects.filter((p) => ['Won', 'Lost'].includes(p.stage))
-                  .length
-              }
+              {pipeline.filter((p) => ['Won', 'Lost'].includes(p.stage)).length}
             </span>
           </button>
         </div>
-        <span>Sales stage and task progress stay distinct</span>
+        <span>Won → review details → create client record</span>
       </div>
+      {error && !prospect && (
+        <p className="error-banner" role="alert">
+          {error}
+        </p>
+      )}
       {!ready ? (
         <p className="desk-empty">Loading the sales pipeline…</p>
       ) : (
         <div className={`sales-lanes ${closed ? 'closed' : ''}`}>
           {stages.map((stage) => {
-            const people = data.prospects.filter((p) => p.stage === stage);
+            const people = pipeline.filter((p) => p.stage === stage);
             return (
               <section
                 key={stage}
@@ -173,7 +184,7 @@ export default function SalesPipeline({
                         <small>
                           {data.members.find((m) => m.id === p.owner)?.name ||
                             'Workspace'}{' '}
-                          · Prospect
+                          · {p.clientId ? 'Client' : 'Prospect'}
                         </small>
                         <span className="prospect-next">
                           <span>Next action</span>
@@ -188,6 +199,15 @@ export default function SalesPipeline({
                           <ArrowUpRight size={15} />
                         </footer>
                       </button>
+                      {p.stage === 'Won' && (
+                        <button
+                          className="sales-create-client"
+                          disabled={busy}
+                          onClick={() => setConverting(p.id)}
+                        >
+                          Create client record <ArrowUpRight size={15} />
+                        </button>
+                      )}
                     </article>
                   );
                 })}
@@ -202,6 +222,22 @@ export default function SalesPipeline({
             );
           })}
         </div>
+      )}
+      {conversion && (
+        <ProspectClientForm
+          key={conversion.id}
+          prospect={conversion}
+          data={data}
+          busy={busy}
+          error={error}
+          act={act}
+          close={() => setConverting(null)}
+          complete={() => {
+            setCreated(conversion.id);
+            setConverting(null);
+            select(null);
+          }}
+        />
       )}
       <Sheet open={!!prospect} onOpenChange={(open) => !open && select(null)}>
         <SheetContent className="prospect-sheet">
@@ -240,6 +276,30 @@ export default function SalesPipeline({
                   </SelectContent>
                 </Select>
               </div>
+              {prospect.stage === 'Won' && (
+                <button
+                  className="os-button"
+                  disabled={busy}
+                  onClick={() => {
+                    select(null);
+                    setConverting(prospect.id);
+                  }}
+                >
+                  Create client record <ArrowUpRight size={16} />
+                </button>
+              )}
+              {prospect.clientId &&
+                data.spaces.some((s) => s.id === prospect.clientId) && (
+                  <button
+                    className="os-button"
+                    onClick={() => {
+                      select(null);
+                      openClient(prospect.clientId!);
+                    }}
+                  >
+                    Open client space <ArrowUpRight size={16} />
+                  </button>
+                )}
               <button
                 className="os-button"
                 disabled={!ready}
@@ -250,6 +310,47 @@ export default function SalesPipeline({
               >
                 <Plus size={15} /> Record the next conversation
               </button>
+              <section className="brief-section">
+                <div className="desk-section-heading">
+                  <h3>Meetings</h3>
+                  <button
+                    className="os-button"
+                    disabled={busy}
+                    onClick={() => {
+                      select(null);
+                      planMeeting(prospect.id);
+                    }}
+                  >
+                    <Plus size={15} /> Add meeting
+                  </button>
+                </div>
+                {data.meetings
+                  .filter((m) => m.prospectId === prospect.id)
+                  .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
+                  .map((m) => (
+                    <button
+                      key={m.id}
+                      className="brief-work-row"
+                      onClick={() => {
+                        select(null);
+                        openMeeting(m.id);
+                      }}
+                    >
+                      <MessageSquare size={17} />
+                      <span>
+                        <strong>{m.title}</strong>
+                        <small>
+                          {readableDate(m.startsAt, true)} · {m.status}
+                        </small>
+                      </span>
+                      <span>Open notes</span>
+                      <ArrowUpRight size={15} />
+                    </button>
+                  ))}
+                {!data.meetings.some((m) => m.prospectId === prospect.id) && (
+                  <p className="desk-empty">No meetings recorded.</p>
+                )}
+              </section>
               <section className="brief-section">
                 <div className="desk-section-heading">
                   <h3>Connected next steps</h3>
@@ -286,7 +387,7 @@ export default function SalesPipeline({
                   ))}
               </section>
               <section className="brief-section">
-                <h3 className="brief-label">The conversation, kept.</h3>
+                <h3 className="brief-label">Conversation history</h3>
                 {data.prospectEvents
                   .filter((e) => e.prospectId === prospect.id)
                   .sort((a, b) => b.createdAt.localeCompare(a.createdAt))

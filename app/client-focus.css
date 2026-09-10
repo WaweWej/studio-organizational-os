@@ -1622,3 +1622,20 @@
   font-size: 0.75rem;
   color: #667854;
 }
+
+/* Client actions remain reachable on narrow client pages. */
+.cf-topline,
+.cf-topline > div {
+  flex-wrap: wrap;
+}
+.cf-topline > div {
+  min-width: 0;
+}
+
+/* Meeting capture shares the same compact forms in Sales and Calendar. */
+.meeting-plan-form { padding: 24px; }
+.meeting-plan-form label, .meeting-connection { display: grid; gap: 8px; font-size: 13px; font-weight: 500; }
+.cf-meeting-editor > .meeting-connection { margin: 16px 0; }
+.sales-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.meeting-plan-fields { display: grid; gap: 20px; border: 0; padding: 0; margin: 0; min-width: 0; }

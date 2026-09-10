@@ -15,6 +15,13 @@ export const organizations = sqliteTable('organizations', {
   name: text('name').notNull(),
   createdAt: text('createdAt').notNull(),
 });
+export const workspaceTransfers = sqliteTable('workspaceTransfers', {
+  org: text('org').primaryKey(),
+  digest: text('digest').notNull(),
+  recordCount: integer('recordCount').notNull(),
+  createdAt: text('createdAt').notNull(),
+  mutation: text('mutation').notNull(),
+});
 export const members = sqliteTable(
   'members',
   {
@@ -67,6 +74,11 @@ export const tasks = sqliteTable(
   'tasks',
   {
     ...identity(),
+    archived: integer('archived').notNull().default(0),
+    dueTime: text('dueTime').notNull().default(''),
+    plannedFor: text('plannedFor').notNull().default(''),
+    focusFor: text('focusFor').notNull().default(''),
+    reviewRequired: integer('reviewRequired').notNull().default(1),
     title: text('title').notNull(),
     prospectId: text('prospectId'),
     projectId: text('projectId'),
@@ -93,6 +105,84 @@ export const tasks = sqliteTable(
     index('tasks_by_project').on(t.org, t.projectId),
   ],
 );
+export const taskDeletions = sqliteTable(
+  'taskDeletions',
+  {
+    ...identity(),
+    revision: integer('revision').notNull(),
+    actor: text('actor').notNull(),
+    createdAt: text('createdAt').notNull(),
+    mutation: text('mutation').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.id] })],
+);
+
+export const calendarEvents = sqliteTable(
+  'calendarEvents',
+  {
+    ...identity(),
+    meetingId: text('meetingId'),
+    title: text('title').notNull(),
+    kind: text('kind').notNull(),
+    date: text('date').notNull(),
+    time: text('time').notNull().default(''),
+    description: text('description').notNull().default(''),
+    revision: integer('revision').notNull().default(0),
+    archived: integer('archived').notNull().default(0),
+    actor: text('actor').notNull(),
+    createdAt: text('createdAt').notNull(),
+    updatedAt: text('updatedAt').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    lastMutation: text('lastMutation').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    index('calendar_by_date').on(t.org, t.date),
+  ],
+);
+
+export const calendarHistory = sqliteTable(
+  'calendarHistory',
+  {
+    ...identity(),
+    eventId: text('eventId').notNull(),
+    snapshot: text('snapshot').notNull(),
+    actor: text('actor').notNull(),
+    createdAt: text('createdAt').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.id] })],
+);
+
+export const dailyPlans = sqliteTable(
+  'dailyPlans',
+  {
+    ...identity(),
+    day: text('day').notNull(),
+    actor: text('actor').notNull(),
+    sourceText: text('sourceText').notNull(),
+    summary: text('summary').notNull(),
+    createdAt: text('createdAt').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    lastMutation: text('lastMutation').notNull(),
+    deliveryStatus: text('deliveryStatus').notNull().default('not_connected'),
+    deliveryError: text('deliveryError').notNull().default(''),
+    deliveryClaim: text('deliveryClaim').notNull().default(''),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    index('plans_by_day').on(t.org, t.actor, t.day),
+  ],
+);
+export const dailyPlanTasks = sqliteTable(
+  'dailyPlanTasks',
+  {
+    org: text('org').notNull(),
+    planId: text('planId').notNull(),
+    taskId: text('taskId').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.planId, t.taskId] })],
+);
+
 export const notes = sqliteTable(
   'notes',
   {
@@ -180,7 +270,10 @@ export const meetings = sqliteTable(
   'meetings',
   {
     ...identity(),
-    spaceId: text('spaceId').notNull(),
+    spaceId: text('spaceId'),
+    prospectId: text('prospectId'),
+    participants: text('participants').notNull().default(''),
+    fingerprint: text('fingerprint').notNull().default(''),
     title: text('title').notNull(),
     startsAt: text('startsAt').notNull(),
     agenda: text('agenda').notNull(),
@@ -194,13 +287,15 @@ export const meetings = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.org, t.id] }),
     index('meetings_by_space').on(t.org, t.spaceId, t.startsAt),
+    index('meetings_by_prospect').on(t.org, t.prospectId, t.startsAt),
   ],
 );
 export const spaceEvents = sqliteTable(
   'spaceEvents',
   {
     ...identity(),
-    spaceId: text('spaceId').notNull(),
+    spaceId: text('spaceId'),
+    prospectId: text('prospectId'),
     meetingId: text('meetingId'),
     body: text('body').notNull(),
     snapshot: text('snapshot').notNull(),
@@ -295,6 +390,9 @@ export const prospects = sqliteTable(
     ...identity(),
     name: text('name').notNull(),
     nameKey: text('nameKey').notNull(),
+    clientId: text('clientId'),
+    convertedAt: text('convertedAt').notNull().default(''),
+    conversionFingerprint: text('conversionFingerprint').notNull().default(''),
     owner: text('owner').notNull(),
     stage: text('stage').notNull(),
     revision: integer('revision').notNull().default(0),
@@ -348,4 +446,18 @@ export const captureEntries = sqliteTable(
     primaryKey({ columns: [t.org, t.id] }),
     index('captures_by_actor').on(t.org, t.actor, t.createdAt),
   ],
+);
+
+export const clientRemovals = sqliteTable(
+  'clientRemovals',
+  {
+    ...identity(),
+    revision: integer('revision').notNull(),
+    action: text('action').notNull(),
+    prospectId: text('prospectId'),
+    actor: text('actor').notNull(),
+    createdAt: text('createdAt').notNull(),
+    mutation: text('mutation').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.id] })],
 );

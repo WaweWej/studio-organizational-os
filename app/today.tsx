@@ -1,20 +1,15 @@
 'use client';
-/* eslint-disable next/no-img-element -- Client covers include explicitly configured remote images; preserve the existing direct cover loading behavior. */
-import { useEffect, useState } from 'react';
+import FinishDay from './finish-day';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   ArrowRight,
-  ArrowUpRight,
-  CornerDownLeft,
-  Layers,
-  Plus,
-  ScanLine,
   CalendarDays,
   CheckCheck,
-  CircleDot,
-  AlertCircle,
+  ClipboardList,
 } from 'lucide-react';
-import { buildDailyBrief, taskContext } from '@/lib/workspace-brief';
-import type { Workspace } from '@/lib/model';
+import { Button } from '@/components/ui/button';
+import { buildDailyBrief, localDay, taskContext } from '@/lib/workspace-brief';
+import type { Workspace, Task } from '@/lib/model';
 
 export function useWorkspaceClock() {
   const [now, setNow] = useState(() => new Date());
@@ -26,7 +21,7 @@ export function useWorkspaceClock() {
 }
 export function readableDate(value: string, time = false) {
   if (!value) return 'No date set';
-  const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
+  const date = new Date(value.length === 10 ? value + 'T12:00:00' : value);
   if (!Number.isFinite(date.getTime())) return 'Date unavailable';
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
@@ -37,323 +32,243 @@ export function readableDate(value: string, time = false) {
 export default function Today({
   data,
   ready,
+  busy,
   openTask,
   openBrief,
-  openSpace,
-  openIntent,
-  openDesk,
-  capture,
+  openMeeting,
+  error,
+  openPlan,
   openBoard,
   openCalendar,
+  openCalendarMeeting,
+  renderBoard,
+  act,
 }: {
   data: Workspace;
   ready: boolean;
+  busy: boolean;
   openTask: (id: string, focus?: 'brief' | 'work') => void;
   openBrief: (id: string) => void;
-  openSpace: (id: string) => void;
-  openIntent: (query?: string) => void;
-  openDesk: () => void;
-  capture: () => void;
+  openMeeting: (spaceId: string | null, meetingId: string) => void;
+  error: string;
+  openPlan: () => void;
   openBoard: () => void;
   openCalendar: () => void;
+  openCalendarMeeting: (id: string) => void;
+  renderBoard: (tasks: Task[]) => ReactNode;
+  act: (command: Record<string, unknown>) => Promise<boolean>;
 }) {
-  const now = useWorkspaceClock();
-  const [allAttention, setAllAttention] = useState(false);
-  const brief = buildDailyBrief(data, now);
-  const meeting = brief.upcoming[0];
-  const client = data.spaces.find((s) => s.id === meeting?.spaceId);
-  const member = data.members.find((m) => m.id === data.currentMember);
-  const greeting =
-    now.getHours() < 12
-      ? 'Good morning'
-      : now.getHours() < 18
-        ? 'Good afternoon'
-        : 'Good evening';
-  const activeSpaces = data.spaces.filter((s) =>
-    data.tasks.some(
-      (t) => t.stage !== 'Done' && taskContext(data, t).space?.id === s.id,
-    ),
-  );
+  const [finishing, setFinishing] = useState(false);
+  const now = useWorkspaceClock(),
+    day = localDay(now),
+    brief = buildDailyBrief(data, now);
+  const plans = (data.dailyPlans || [])
+    .filter((p) => p.day === day && p.actor === data.currentMember)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const plan = plans[0];
+  const statuses = {
+    not_connected: 'Slack not connected',
+    pending: 'Slack message pending',
+    sending: 'Sending to Slack',
+    sent: 'Posted to Slack',
+    failed: 'Slack delivery failed',
+    unknown: 'Slack delivery needs checking',
+  };
   return (
-    <div className="today-desk">
-      <header className="desk-heading">
+    <div className="today-plan">
+      <header className="today-plan-heading">
         <div>
-          <p className="os-overline">
+          <p>
             {now.toLocaleDateString('en-GB', {
               weekday: 'long',
               day: 'numeric',
               month: 'long',
             })}
           </p>
-          <h1>
-            {greeting}
-            {member ? `, ${member.name.split(' ')[0]}` : ''}
-            <span>.</span>
-          </h1>
-          <p>Your work, with the context already here.</p>
+          <h1>Today</h1>
         </div>
-        <button className="os-button" onClick={capture} disabled={!ready}>
-          <Plus size={16} /> Capture anything <kbd>↵</kbd>
-        </button>
+        <div className="today-heading-actions">
+          <Button
+            variant="outline"
+            disabled={!ready || busy}
+            onClick={() => setFinishing(true)}
+          >
+            Finish day
+          </Button>
+          <Button onClick={openPlan} disabled={!ready}>
+            <ClipboardList size={17} />
+            {plan ? 'Add to today’s plan' : 'Plan my day'}
+            <ArrowRight size={16} />
+          </Button>
+        </div>
       </header>
-      <button className="desk-intent" onClick={openDesk} disabled={!ready}>
-        <span className="intent-symbol">
-          <ScanLine size={23} />
-        </span>
-        <span>
-          <strong>Your desk for the whole day.</strong>
-          <small>
-            Jot notes, meetings, tasks, and deadlines. Keep everything
-            connected.
-          </small>
-        </span>
-        <span className="intent-shortcut">
-          <span>Open desk</span>
-          <ArrowRight size={20} />
-        </span>
-      </button>
+      {finishing && (
+        <FinishDay
+          tasks={brief.todayTasks}
+          busy={busy}
+          error={error}
+          act={act}
+          close={() => setFinishing(false)}
+        />
+      )}
       {!ready ? (
-        <div className="desk-empty">
-          Your brief will appear when the workspace has loaded.
-        </div>
+        <p>Opening your day…</p>
       ) : (
         <>
-          <div className="desk-grid">
-            <div className="desk-primary">
-              <section className="desk-section">
-                <div className="desk-section-heading">
-                  <h2>
-                    Needs your attention <span>{brief.attention.length}</span>
-                  </h2>
-                  {brief.attention.length > 2 && (
-                    <button onClick={() => setAllAttention(!allAttention)}>
-                      {allAttention ? 'Show less' : 'See all'}{' '}
-                      <ArrowRight size={13} />
-                    </button>
+          <div className="today-plan-status">
+            <span>
+              {plan ? 'Daily plan committed' : 'No daily plan committed yet'} ·{' '}
+              {brief.planned.length} planned · {brief.carryover.length} carried
+              over
+            </span>
+            {plan && (
+              <span>
+                {statuses[plan.deliveryStatus]}
+                {data.slackConnected &&
+                  ['failed', 'pending', 'not_connected'].includes(
+                    plan.deliveryStatus,
+                  ) && (
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        void act({ type: 'daily-plan-deliver', id: plan.id })
+                      }
+                    >
+                      Send to Slack
+                    </Button>
                   )}
-                </div>
-                <div className="attention-stack">
-                  {(allAttention
-                    ? brief.attention
-                    : brief.attention.slice(0, 2)
-                  ).map(({ task, kind, reason }) => {
-                    const context = taskContext(data, task);
-                    return (
-                      <button
-                        className={`desk-attention ${kind}`}
-                        key={task.id}
-                        onClick={() =>
-                          openTask(
-                            task.id,
-                            kind === 'review' ? 'work' : 'brief',
-                          )
-                        }
-                      >
-                        <span className="attention-mark">
-                          {kind === 'review' ? (
-                            <CheckCheck size={19} />
-                          ) : (
-                            <AlertCircle size={19} />
-                          )}
-                        </span>
-                        <span className="attention-copy">
-                          <small>
-                            {context.space?.name ||
-                              context.prospect?.name ||
-                              'Internal'}{' '}
-                            ·{' '}
-                            {kind === 'review'
-                              ? 'Review'
-                              : kind === 'blocked'
-                                ? 'Blocked'
-                                : 'Overdue'}
-                          </small>
-                          <strong>{task.title}</strong>
-                          <p>{reason}</p>
-                        </span>
-                        <span className="attention-action">
-                          {kind === 'review' ? 'Review' : 'Open'}{' '}
-                          <ArrowUpRight size={16} />
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {!brief.attention.length && (
-                    <p className="desk-empty">
-                      <CheckCheck size={20} /> No pending reviews, recorded
-                      blockers, or overdue tasks assigned to you.
-                    </p>
-                  )}
-                </div>
-              </section>
-              <section className="desk-section focus-section">
-                <div className="desk-section-heading">
-                  <h2>Pick up where you left off</h2>
-                  <button onClick={openBoard}>
-                    My board <ArrowRight size={13} />
-                  </button>
-                </div>
-                <p className="section-caption">
-                  Your in-progress work first, then your queue.
-                </p>
-                {brief.focus.slice(0, 3).map((task) => {
-                  const context = taskContext(data, task);
-                  return (
-                    <button
-                      className="desk-focus-row"
-                      key={task.id}
-                      onClick={() => openTask(task.id)}
-                    >
-                      <span className="focus-state">
-                        <CircleDot size={18} />
-                      </span>
-                      <span>
-                        <strong>{task.title}</strong>
-                        <small>
-                          <i
-                            style={{
-                              background: context.space?.color || '#8c919b',
-                            }}
-                          />
-                          {context.space?.name ||
-                            context.prospect?.name ||
-                            'Internal'}
-                          {context.project ? ` / ${context.project.name}` : ''}
-                        </small>
-                      </span>
-                      <span className="focus-stage">
-                        {task.stage === 'Doing' ? 'In progress' : 'Up next'}
-                      </span>
-                      <ArrowUpRight size={17} />
-                    </button>
-                  );
-                })}
-                {!brief.focus.length && (
-                  <div className="desk-empty">
-                    A clear desk.{' '}
-                    <button onClick={capture}>
-                      Capture your next task <Plus size={14} />
-                    </button>
-                  </div>
-                )}
-              </section>
-            </div>
-            <aside className="desk-aside">
-              <section className="next-meeting">
-                <div className="desk-section-heading">
-                  <h2>Next conversation</h2>
-                  <button
-                    onClick={openCalendar}
-                    aria-label="Open shared calendar"
-                  >
-                    <CalendarDays size={17} />
-                  </button>
-                </div>
-                {meeting && client ? (
-                  <>
-                    <div
-                      className="meeting-brand"
-                      style={{ background: client.color }}
-                    >
-                      {client.coverUrl && <img src={client.coverUrl} alt="" />}
-                      <span>{client.name}</span>
-                    </div>
-                    <div className="meeting-preview">
-                      <p className="os-overline">
-                        {readableDate(meeting.startsAt, true)}
-                      </p>
-                      <h3>{meeting.title}</h3>
-                      <p>
-                        {meeting.agenda
-                          ? 'Agenda, last decisions, and current work. Together.'
-                          : 'Gather the context and shape your agenda.'}
-                      </p>
-                      <button
-                        className="os-button os-button-dark"
-                        onClick={() => openBrief(client.id)}
-                      >
-                        <ScanLine size={17} /> Prepare me{' '}
-                        <ArrowRight size={16} />
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="meeting-preview">
-                    <h3>Room for a conversation.</h3>
-                    <p>
-                      No upcoming meeting is recorded. You can still prepare a
-                      client brief.
-                    </p>
-                    <button
-                      className="os-button"
-                      onClick={() => openIntent('prepare')}
-                    >
-                      Choose a client <ArrowRight size={15} />
-                    </button>
-                  </div>
-                )}
-              </section>
-              <div className="context-footnote">
-                <span className="status-dot" />
-                <span>
-                  {data.demo ? 'Sample workspace' : 'Workspace records'}
-                  <small>
-                    This brief reads saved tasks and meetings. External channels
-                    aren’t connected yet.
-                  </small>
-                </span>
-              </div>
-            </aside>
+              </span>
+            )}
           </div>
-          <section className="desk-section space-shelf-section">
-            <div className="desk-section-heading">
-              <h2>Where things are moving</h2>
-              <span className="section-caption">Spaces with open work</span>
-            </div>
-            <div className="desk-spaces">
-              {activeSpaces.slice(0, 4).map((s) => {
-                const work = data.tasks.filter(
-                  (t) =>
-                    t.stage !== 'Done' &&
-                    taskContext(data, t).space?.id === s.id,
-                );
-                return (
-                  <button
-                    className="desk-space"
-                    key={s.id}
-                    onClick={() => openSpace(s.id)}
-                  >
-                    <span
-                      className="desk-space-mark"
-                      style={{ color: s.color, background: `${s.color}15` }}
-                    >
-                      {s.name.slice(0, 1)}
-                    </span>
-                    <span>
-                      <strong>{s.name}</strong>
-                      <small>
-                        {work.length} open{' '}
-                        {work.length === 1 ? 'task' : 'tasks'}
-                      </small>
-                    </span>
-                    <ArrowUpRight size={16} />
-                  </button>
-                );
-              })}
-              {!activeSpaces.length && (
-                <p className="section-caption">
-                  Client work will appear here as it starts.
-                </p>
-              )}
-            </div>
+          {plan?.deliveryError && (
+            <p className="daily-plan-warning">{plan.deliveryError}</p>
+          )}
+          <section className="today-priorities">
+            <header>
+              <h2>Priorities</h2>
+              <span>{brief.priorities.length} / 3</span>
+            </header>
+            {brief.priorities.map((task) => (
+              <button key={task.id} onClick={() => openTask(task.id)}>
+                {task.title}
+              </button>
+            ))}
+            {!brief.priorities.length && (
+              <p>
+                Use a task’s menu to choose up to three priorities for today.
+              </p>
+            )}
           </section>
-          <footer className="desk-footer">
-            <Layers size={14} />
-            <span>One workspace. Every change stays with its work.</span>
-            <button onClick={capture}>
-              <CornerDownLeft size={13} /> Enter to capture
-            </button>
-          </footer>
+          <div className="today-context-grid">
+            <section>
+              <header>
+                <h2>
+                  <CalendarDays size={18} />
+                  Today & upcoming meetings
+                </h2>
+                <Button variant="ghost" onClick={openCalendar}>
+                  Calendar
+                </Button>
+              </header>
+              {brief.schedule.slice(0, 5).map((entry) => (
+                <button
+                  className="today-context-row"
+                  key={entry.key}
+                  onClick={() =>
+                    entry.source === 'meeting'
+                      ? openMeeting(entry.spaceId, entry.id)
+                      : entry.source === 'calendar' && entry.kind === 'meeting'
+                        ? openCalendarMeeting(entry.id)
+                        : entry.spaceId
+                          ? openBrief(entry.spaceId)
+                          : openCalendar()
+                  }
+                >
+                  <span>
+                    <strong>{entry.title}</strong>
+                    <small>
+                      {entry.spaceId || entry.prospectId
+                        ? entry.client
+                        : entry.kind === 'meeting'
+                          ? 'Meeting'
+                          : 'Event'}
+                    </small>
+                  </span>
+                  <span>
+                    {readableDate(entry.due)}
+                    {entry.time ? ' · ' + entry.time : ' · All day'}
+                  </span>
+                </button>
+              ))}
+              {!brief.schedule.length && <p>No upcoming meetings or events.</p>}
+            </section>
+            <section>
+              <header>
+                <h2>
+                  <CheckCheck size={18} />
+                  Reviews & attention
+                </h2>
+                <span>{brief.attention.length}</span>
+              </header>
+              {brief.attention.map(({ task, kind, reason }) => (
+                <button
+                  className="today-context-row"
+                  key={task.id}
+                  onClick={() =>
+                    openTask(task.id, kind === 'review' ? 'work' : 'brief')
+                  }
+                >
+                  <span>
+                    <strong>{task.title}</strong>
+                    <small>{reason}</small>
+                  </span>
+                  <span>
+                    {kind === 'review'
+                      ? 'Review'
+                      : kind === 'blocked'
+                        ? 'Blocked'
+                        : 'Overdue'}
+                  </span>
+                </button>
+              ))}
+              {!brief.attention.length && (
+                <p>No reviews, blockers or overdue tasks need you.</p>
+              )}
+            </section>
+          </div>
+          <section className="today-board-section">
+            <header>
+              <div>
+                <h2>Your day</h2>
+                <p>
+                  Today’s plan, due tasks and unfinished work from earlier days.
+                </p>
+              </div>
+              <Button variant="ghost" onClick={openBoard}>
+                All my work <ArrowRight size={15} />
+              </Button>
+            </header>
+            {!!brief.carryover.length && (
+              <details className="today-carryover">
+                <summary>
+                  {brief.carryover.length} tasks carried forward
+                </summary>
+                {brief.carryover.map((task) => (
+                  <button key={task.id} onClick={() => openTask(task.id)}>
+                    {task.title}
+                    <small>
+                      {taskContext(data, task).project?.name || 'Personal'}
+                      {task.plannedFor
+                        ? ' · planned ' + readableDate(task.plannedFor)
+                        : ''}
+                    </small>
+                  </button>
+                ))}
+              </details>
+            )}
+            {renderBoard(brief.todayTasks)}
+          </section>
         </>
       )}
     </div>

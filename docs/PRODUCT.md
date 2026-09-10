@@ -6,6 +6,6 @@ The Desk is the entry point, with personal and team boards available through Tod
 
 Current implementation target: a persistent daily-work-to-review loop. Deliverable approval and external delivery are separate actions. Sample data must be labeled. No external service is treated as connected without verification.
 
-Initial demo organization: six sample people, ten spaces, five projects, twelve tasks, several review states, one blocked task, tool records, and a small knowledge collection. Sample people are not authenticated invited team members.
+Workspaces now start empty, with the owner account only. The original demo records remain synthetic test fixtures, and are no longer seeded into the app. Real team invitations remain future work.
 
 Deferred: commercial billing, unrestricted plugins, full ERP, complex external client accounts, production automation cutover. These are not being silently removed from the longer-term product direction.

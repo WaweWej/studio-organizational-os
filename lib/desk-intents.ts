@@ -13,6 +13,24 @@ const prefix = (value: string) =>
 const create = '(?:add|create|start)\\s+(?:a\\s+)?(?:new\\s+)?';
 export const deskIntents: DeskIntent[] = [
   {
+    id: 'day',
+    kind: 'daily',
+    title: 'Plan my day',
+    insert: 'Plan my day',
+    example: 'Plan my day: one task per line, with @client or @project',
+    aliases: [
+      'daily tasks',
+      'today:',
+      'plan my day',
+      'plan today',
+      'today’s tasks',
+      'daily plan',
+    ],
+    pattern: prefix(
+      '\\/day|\\/daily|plan my day|plan today|daily tasks|daily plan|today(?:[’\u0027]s)? tasks|today(?=\\s*:)',
+    ),
+  },
+  {
     id: 'note',
     kind: 'note',
     title: 'Add a note',

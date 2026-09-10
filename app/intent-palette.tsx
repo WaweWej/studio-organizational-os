@@ -41,6 +41,7 @@ export default function IntentPalette({
   openProject,
   openDocument,
   openBrief,
+  openMeeting,
   capture,
   openBoard,
   openToday,
@@ -61,6 +62,7 @@ export default function IntentPalette({
   openSales: () => void;
   openEntry: (entry: CaptureEntry) => void;
   openBrief: (id: string) => void;
+  openMeeting: (id: string) => void;
   capture: (text?: string) => void;
   openBoard: () => void;
   openToday: () => void;
@@ -105,7 +107,7 @@ export default function IntentPalette({
             {!query.trim() && next && (
               <CommandItem
                 value="prepare next meeting"
-                onSelect={() => go(() => openBrief(next.spaceId))}
+                onSelect={() => go(() => openMeeting(next.id))}
               >
                 <ScanLine size={18} />
                 <span>

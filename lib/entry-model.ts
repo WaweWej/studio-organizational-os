@@ -4,6 +4,7 @@ import { parseCapture, type CaptureMention } from './task-capture';
 import { parseSalesCapture } from './sales-model';
 
 export type EntryKind =
+  | 'daily'
   | 'task'
   | 'note'
   | 'meeting'
@@ -20,7 +21,7 @@ export type CaptureEntry = {
   sourceText: string;
   title: string;
   body: string;
-  targetType: 'note' | 'task' | 'meeting' | 'project';
+  targetType: 'note' | 'task' | 'meeting' | 'project' | 'plan';
   targetId: string;
   spaceId: string | null;
   projectId: string | null;
@@ -343,6 +344,7 @@ export function captureDestination(
   const project = data.projects.find((p) => p.id === entry.projectId);
   const space = data.spaces.find((s) => s.id === entry.spaceId);
   const context = task?.title || project?.name || space?.name;
+  if (entry.kind === 'daily') return 'Today · Daily plan';
   if (entry.kind === 'project') return `${project?.name || 'Work'} · Project`;
   if (isTaskUpdate(entry.kind))
     return `${context || 'Choose a task'} · ${entry.kind === 'progress' ? 'Progress' : entry.kind === 'blocker' ? 'Blocker' : 'Status'}`;

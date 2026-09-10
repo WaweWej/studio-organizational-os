@@ -1,5 +1,6 @@
 import type { Workspace, Task } from './model';
 import { taskSpaceId } from './task-context';
+import { calendarEntries } from './calendar-model';
 
 export function localDay(now: Date) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -29,11 +30,13 @@ export type Attention = {
   reason: string;
 };
 export function buildDailyBrief(data: Workspace, now: Date) {
-  const open = data.tasks.filter((t) => t.stage !== 'Done');
+  const open = data.tasks.filter((t) => !t.archived && t.stage !== 'Done');
   const reviews = open.filter(
     (t) => t.reviewer === data.currentMember && pendingReview(data, t),
   );
-  const blocked = open.filter((t) => !!t.blocked.trim());
+  const blocked = open.filter(
+    (t) => t.assignee === data.currentMember && !!t.blocked.trim(),
+  );
   const overdue = open
     .filter(
       (t) =>
@@ -82,7 +85,63 @@ export function buildDailyBrief(data: Workspace, now: Date) {
   const recent = data.activities
     .filter((a) => Date.parse(a.createdAt) <= now.getTime())
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return { attention, focus, upcoming, recent, reviews, blocked, overdue };
+  const today = localDay(now);
+  const planned = data.tasks.filter(
+    (t) =>
+      !t.archived &&
+      t.assignee === data.currentMember &&
+      t.plannedFor === today,
+  );
+  const carryover = open.filter(
+    (t) =>
+      t.assignee === data.currentMember &&
+      (!t.plannedFor || t.plannedFor < today) &&
+      ((!!t.plannedFor && t.plannedFor < today) ||
+        (!!t.due && t.due < today) ||
+        t.stage === 'Doing'),
+  );
+  const todayTasks = [
+    ...new Map(
+      [
+        ...planned,
+        ...carryover,
+        ...open.filter(
+          (t) =>
+            t.assignee === data.currentMember &&
+            t.due === today &&
+            (!t.plannedFor || t.plannedFor <= today),
+        ),
+      ].map((t) => [t.id, t]),
+    ).values(),
+  ].sort(
+    (a, b) =>
+      Number(b.focusFor === today) - Number(a.focusFor === today) ||
+      Number(b.stage === 'Doing') - Number(a.stage === 'Doing') ||
+      a.position - b.position,
+  );
+  const schedule = calendarEntries(data).filter(
+    (e) =>
+      ['meeting', 'event'].includes(e.kind) &&
+      !e.complete &&
+      e.due >= today &&
+      (e.source !== 'calendar' || e.ownerId === data.currentMember),
+  );
+  return {
+    attention,
+    focus,
+    upcoming,
+    recent,
+    reviews,
+    blocked,
+    overdue,
+    planned,
+    priorities: todayTasks.filter(
+      (t) => t.focusFor === today && t.stage !== 'Done',
+    ),
+    carryover,
+    todayTasks,
+    schedule,
+  };
 }
 export function buildClientBrief(data: Workspace, spaceId: string, now: Date) {
   const space = data.spaces.find((s) => s.id === spaceId);

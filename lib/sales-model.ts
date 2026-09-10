@@ -12,6 +12,9 @@ export type Prospect = {
   id: string;
   name: string;
   nameKey: string;
+  clientId?: string | null;
+  convertedAt?: string;
+  conversionFingerprint?: string;
   owner: string;
   stage: SalesStage;
   revision: number;

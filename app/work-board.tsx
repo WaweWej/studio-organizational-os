@@ -13,15 +13,42 @@ import {
   Link2,
   GripVertical,
   Flag,
+  Archive,
+  MoreHorizontal,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+} from '@/components/ui/alert-dialog';
+import { localDay } from '@/lib/workspace-brief';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { stages, type Workspace, type Task, type Stage } from '@/lib/model';
 import { taskSpaceId } from '@/lib/task-context';
 import { relatedResources } from '@/lib/resource-model';
@@ -31,6 +58,7 @@ const stageIcons = [Circle, CircleDot, Clock3, CircleCheck];
 export default function WorkBoard({
   data,
   tasks,
+  archivedTasks = [],
   ready,
   busy,
   error,
@@ -44,6 +72,7 @@ export default function WorkBoard({
 }: {
   data: Workspace;
   tasks: Task[];
+  archivedTasks?: Task[];
   ready: boolean;
   busy: boolean;
   error: string;
@@ -55,6 +84,34 @@ export default function WorkBoard({
   enabled: boolean;
   drafts: Map<string, CaptureDraft>;
 }) {
+  const [waiting, setWaiting] = useState<Task | null>(null);
+  const [waitingText, setWaitingText] = useState('');
+  const [undo, setUndo] = useState<Task | null>(null);
+  const planTask = async (task: Task, mode: string) => {
+    const now = new Date(),
+      day = localDay(now);
+    now.setDate(now.getDate() + 1);
+    if (
+      await act({
+        type: 'day-work',
+        mode,
+        day,
+        items: [{ id: task.id, revision: task.revision }],
+        ...(mode === 'plan'
+          ? { plannedFor: localDay(now) }
+          : { focus: task.focusFor !== day }),
+      })
+    ) {
+      if (mode === 'plan') setUndo(task);
+    }
+  };
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Task | null>(null);
+  const [deleteError, setDeleteError] = useState(false);
+  const requestDelete = (task: Task) => {
+    setDeleteError(false);
+    setDeleting(task);
+  };
   const [capturing, setCapturing] = useState(false),
     [recent, setRecent] = useState<{ id: string; title: string } | null>(null),
     [over, setOver] = useState<Stage | null>(null);
@@ -78,7 +135,7 @@ export default function WorkBoard({
     }
   }, [captureRequested]);
   useEffect(() => {
-    if (!enabled || !ready) return;
+    if (!enabled || !ready || archiveOpen || deleting) return;
     const key = (e: KeyboardEvent) => {
       if (
         e.key !== 'Enter' ||
@@ -110,11 +167,90 @@ export default function WorkBoard({
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [enabled, ready]);
+  }, [enabled, ready, archiveOpen, deleting]);
   const move = (task: Task, stage: Stage) =>
     void act({ type: 'move', id: task.id, revision: task.revision, stage });
   return (
     <section className="workboard" aria-label="Task board">
+      {undo && (
+        <output className="day-undo">
+          Moved “{undo.title}” to tomorrow.{' '}
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={async () => {
+              if (
+                await act({
+                  type: 'day-work',
+                  mode: 'plan',
+                  day: localDay(new Date()),
+                  plannedFor: undo.plannedFor || '',
+                  focusFor: undo.focusFor || '',
+                  items: [{ id: undo.id, revision: undo.revision + 1 }],
+                })
+              )
+                setUndo(null);
+            }}
+          >
+            Undo
+          </Button>
+          <Button variant="ghost" onClick={() => setUndo(null)}>
+            Dismiss
+          </Button>
+        </output>
+      )}
+      <Dialog
+        open={!!waiting}
+        onOpenChange={(open) => !open && !busy && setWaiting(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>What are you waiting for?</DialogTitle>
+            <DialogDescription>{waiting?.title}</DialogDescription>
+          </DialogHeader>
+          <Input
+            aria-label="Waiting for"
+            value={waitingText}
+            onChange={(e) => setWaitingText(e.target.value)}
+            placeholder="Feedback from the client"
+          />
+          {error && <p role="alert">{error}</p>}
+          <Button
+            disabled={busy}
+            onClick={async () => {
+              if (
+                waiting &&
+                (await act({
+                  type: 'day-work',
+                  mode: 'waiting',
+                  day: localDay(new Date()),
+                  blocked: waitingText,
+                  items: [{ id: waiting.id, revision: waiting.revision }],
+                }))
+              )
+                setWaiting(null);
+            }}
+          >
+            Save
+          </Button>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => setWaiting(null)}
+          >
+            Cancel
+          </Button>
+        </DialogContent>
+      </Dialog>
+      <div className="board-toolbar">
+        <Button
+          variant="ghost"
+          onClick={() => setArchiveOpen(true)}
+          disabled={!ready}
+        >
+          <Archive size={16} /> Archive ({archivedTasks.length})
+        </Button>
+      </div>
       <div ref={capture} className="board-capture-area">
         <div hidden={capturing}>
           <button
@@ -126,7 +262,7 @@ export default function WorkBoard({
               <Plus size={19} />
             </span>
             <span>
-              Capture what’s on your mind.
+              Add work
               <small>
                 Notes, meetings, tasks. Connect the context with{' '}
                 <AtSign size={12} />.
@@ -225,7 +361,20 @@ export default function WorkBoard({
                     busy={busy || !ready}
                     fresh={recent?.id === task.id}
                     openTask={openTask}
+                    planTask={planTask}
+                    waitFor={(task) => {
+                      setWaiting(task);
+                      setWaitingText(task.blocked);
+                    }}
                     move={move}
+                    archive={(task) =>
+                      void act({
+                        type: 'task-archive',
+                        id: task.id,
+                        revision: task.revision,
+                      })
+                    }
+                    remove={requestDelete}
                     drag={(t) => {
                       dragged.current = t;
                     }}
@@ -234,15 +383,7 @@ export default function WorkBoard({
                 {!items.length && (
                   <div className="workboard-empty">
                     <Icon size={22} />
-                    <p>
-                      {stage === 'Up next'
-                        ? 'Room for the next idea.'
-                        : stage === 'Doing'
-                          ? 'Ready when you are.'
-                          : stage === 'Review'
-                            ? 'A fresh pair of eyes.'
-                            : 'Make room for the finished work.'}
-                    </p>
+                    <p>No tasks</p>
                     <small>
                       {stage === 'Up next'
                         ? 'Press Enter to capture a task.'
@@ -250,7 +391,7 @@ export default function WorkBoard({
                           ? 'Move a task here when you start.'
                           : stage === 'Review'
                             ? 'Save a deliverable, then request review.'
-                            : 'Approved work lands here.'}
+                            : 'Finished work lands here.'}
                     </small>
                   </div>
                 )}
@@ -259,6 +400,95 @@ export default function WorkBoard({
           );
         })}
       </div>
+      <Sheet open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Archived tasks</SheetTitle>
+            <SheetDescription>
+              Restore a task to its previous stage, or delete it permanently.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="p-4 space-y-4">
+            {error && <p role="alert">{error}</p>}
+            {!archivedTasks.length && <p>No archived tasks.</p>}
+            {archivedTasks.map((task) => (
+              <div key={task.id} className="border-b pb-4">
+                <h3 className="font-medium">{task.title}</h3>
+                <p className="text-sm text-muted-foreground">{task.stage}</p>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      void act({
+                        type: 'task-restore',
+                        id: task.id,
+                        revision: task.revision,
+                      })
+                    }
+                  >
+                    Restore
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => requestDelete(task)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open && !busy) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deleting?.title}” and its notes, reviews and task history will
+              be permanently removed. Shared files and the source meeting or
+              sales conversation remain. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p role="alert">
+              {error || 'Could not delete the task. Refresh and try again.'}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onClick={() => setDeleting(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={busy}
+              onClick={async () => {
+                if (!deleting) return;
+                const saved = await act({
+                  type: 'task-delete',
+                  id: deleting.id,
+                  revision: deleting.revision,
+                });
+                if (saved) setDeleting(null);
+                else setDeleteError(true);
+              }}
+            >
+              {busy ? 'Deleting…' : 'Delete task'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
@@ -269,6 +499,10 @@ function BoardCard({
   fresh,
   openTask,
   move,
+  archive,
+  planTask,
+  waitFor,
+  remove,
   drag,
 }: {
   task: Task;
@@ -277,6 +511,10 @@ function BoardCard({
   fresh: boolean;
   openTask: (id: string, focus?: 'brief' | 'work') => void;
   move: (t: Task, stage: Stage) => void;
+  archive: (t: Task) => void;
+  planTask: (t: Task, mode: string) => void;
+  waitFor: (t: Task) => void;
+  remove: (t: Task) => void;
   drag: (t: Task | null) => void;
 }) {
   const prospect = data.prospects.find((p) => p.id === task.prospectId);
@@ -304,6 +542,12 @@ function BoardCard({
           <GripVertical size={14} />
         </span>
         <h3>{task.title}</h3>
+        {task.focusFor === localDay(new Date()) && task.stage !== 'Done' && (
+          <span className="work-card-priority">Today’s priority</span>
+        )}
+        {task.reviewRequired === 0 && task.version === 0 && (
+          <span className="work-card-simple">No review needed</span>
+        )}
         <p>
           {project?.name ||
             (prospect
@@ -344,26 +588,57 @@ function BoardCard({
             <Link2 size={14} />
             {resources}
           </button>
-          <Select
-            value={task.stage}
-            onValueChange={(stage) => stage && move(task, stage as Stage)}
-          >
-            <SelectTrigger
+          <DropdownMenu>
+            <DropdownMenuTrigger
               disabled={busy}
               className="work-card-move"
-              aria-label={`Move ${task.title}`}
+              aria-label={`Actions for ${task.title}`}
             >
-              <SelectValue className="sr-only" />
-              <span aria-hidden="true">···</span>
-            </SelectTrigger>
-            <SelectContent>
+              <MoreHorizontal size={16} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="work-actions-menu">
+              {task.assignee === data.currentMember &&
+                task.stage !== 'Done' && (
+                  <>
+                    <DropdownMenuItem onClick={() => planTask(task, 'focus')}>
+                      {task.focusFor === localDay(new Date())
+                        ? 'Remove daily priority'
+                        : 'Make a priority today'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => planTask(task, 'plan')}>
+                      Plan for tomorrow
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => waitFor(task)}>
+                      {task.blocked ? 'Update waiting reason' : 'Waiting for…'}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
               {stages.map((stage) => (
-                <SelectItem value={stage} key={stage}>
+                <DropdownMenuItem
+                  key={stage}
+                  disabled={busy || task.stage === stage}
+                  onClick={() => move(task, stage)}
+                >
                   Move to {stage}
-                </SelectItem>
+                </DropdownMenuItem>
               ))}
-            </SelectContent>
-          </Select>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={busy} onClick={() => archive(task)}>
+                <Archive size={16} />
+                Archive task
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={busy}
+                variant="destructive"
+                onClick={() => remove(task)}
+              >
+                <Trash2 size={16} />
+                Delete task
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </footer>
     </article>

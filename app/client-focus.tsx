@@ -1,11 +1,18 @@
 'use client';
 /* eslint-disable next/no-img-element -- Client images use direct HTTPS addresses; no image proxy is configured. */
 
+import { MeetingConnection, meetingConnection } from './meeting-connection';
+import {
+  readMeetingDraft,
+  writeMeetingDraft,
+  clearMeetingDraft,
+} from '@/lib/meeting-draft';
 import { taskSpaceId } from '@/lib/task-context';
 import {
   useState,
   useEffect,
   useId,
+  useRef,
   cloneElement,
   type CSSProperties,
   type ReactNode,
@@ -29,7 +36,6 @@ import {
   ListChecks,
   Pencil,
   Plus,
-  Sparkles,
   Target,
   X,
 } from 'lucide-react';
@@ -259,6 +265,9 @@ export default function ClientFocus({
   const [meetingDirty, setMeetingDirty] = useState(false);
   const [discardMeeting, setDiscardMeeting] = useState(false);
   const [editBrand, setEditBrand] = useState(false);
+  const [clientAction, setClientAction] = useState<'sales' | 'delete' | null>(
+    null,
+  );
   const [newMeeting, setNewMeeting] = useState(false);
   const [meetingId, setMeetingId] = useState<string | null>(initialMeetingId);
   const [newTask, setNewTask] = useState(false);
@@ -409,6 +418,22 @@ export default function ClientFocus({
           >
             <Pencil size={14} />
             Edit space
+          </Button>
+          {space.type === 'Client' && (
+            <Button
+              variant="ghost"
+              disabled={!ready || busy}
+              onClick={() => setClientAction('sales')}
+            >
+              Move to Sales
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            disabled={!ready || busy}
+            onClick={() => setClientAction('delete')}
+          >
+            Remove client
           </Button>
         </div>
       </div>
@@ -915,6 +940,88 @@ export default function ClientFocus({
       {tab === 'resources' && (
         <RelatedResources target={{ type: 'space', id: space.id }} />
       )}
+      {data.prospects.some((p) => p.clientId === space.id) && (
+        <section className="cf-panel">
+          <h2>Sales history</h2>
+          {data.prospectEvents
+            .filter((e) =>
+              data.prospects.some(
+                (p) => p.clientId === space.id && p.id === e.prospectId,
+              ),
+            )
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .map((e) => (
+              <div key={e.id} className="prospect-event">
+                <div>
+                  <p>{e.body}</p>
+                  <small>{new Date(e.createdAt).toLocaleDateString()}</small>
+                </div>
+              </div>
+            ))}
+        </section>
+      )}
+      <Dialog
+        open={!!clientAction}
+        onOpenChange={(open) => !busy && !open && setClientAction(null)}
+      >
+        <DialogContent className="cf-dialog">
+          <DialogHeader>
+            <DialogTitle>
+              {clientAction === 'sales'
+                ? 'Move ' + space.name + ' to Sales?'
+                : 'Remove ' + space.name + '?'}
+            </DialogTitle>
+            <DialogDescription>
+              {clientAction === 'sales'
+                ? 'Create or reuse the prospect in Sales and connect its tasks. The client profile leaves Spaces; projects remain in Work, and files remain in Library.'
+                : 'Permanently delete the client profile and its meeting history. Tasks, projects, notes and shared files remain, with their client connection removed.'}
+            </DialogDescription>
+          </DialogHeader>
+          <p>
+            {tasks.length} tasks · {projects.length} projects ·{' '}
+            {meetings.length} meetings
+          </p>
+          {clientAction === 'sales' && meetings.length > 0 && (
+            <p role="alert">
+              This client has meeting records. Moving to Sales is available for
+              clients without meetings.
+            </p>
+          )}
+          {error && <p role="alert">{error}</p>}
+          <Button
+            variant={clientAction === 'delete' ? 'destructive' : 'default'}
+            disabled={busy || (clientAction === 'sales' && meetings.length > 0)}
+            onClick={async () => {
+              if (
+                await act({
+                  type:
+                    clientAction === 'sales'
+                      ? 'client-to-prospect'
+                      : 'client-delete',
+                  id: space.id,
+                  revision: space.revision,
+                })
+              ) {
+                setClientAction(null);
+                back();
+              }
+            }}
+          >
+            {busy
+              ? 'Saving…'
+              : clientAction === 'sales'
+                ? 'Move to Sales'
+                : 'Remove client'}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={() => setClientAction(null)}
+          >
+            Cancel
+          </Button>
+        </DialogContent>
+      </Dialog>
       <Dialog open={editBrand} onOpenChange={setEditBrand}>
         <DialogContent className="cf-dialog cf-brand-dialog">
           <DialogHeader>
@@ -1127,6 +1234,8 @@ export default function ClientFocus({
               variant="outline"
               onClick={() => {
                 setDiscardMeeting(false);
+                if (selectedMeeting)
+                  clearMeetingDraft(data.draftScope || '', selectedMeeting.id);
                 setMeetingDirty(false);
                 setMeetingId(null);
               }}
@@ -1358,19 +1467,23 @@ function NewMeeting({
 }
 
 function TaskComposer({
+  allowNoProject = false,
   projects,
   data,
   busy,
   error,
   save,
 }: {
+  allowNoProject?: boolean;
   projects: Project[];
   data: Workspace;
   busy: boolean;
   error: string;
   save: (fields: Record<string, unknown>) => Promise<boolean>;
 }) {
-  const [projectId, setProjectId] = useState(projects[0]?.id || '');
+  const [projectId, setProjectId] = useState(
+    projects[0]?.id || (allowNoProject ? 'none' : ''),
+  );
   const [assignee, setAssignee] = useState(data.currentMember);
   return (
     <form
@@ -1379,7 +1492,14 @@ function TaskComposer({
         e.preventDefault();
         const form = e.currentTarget;
         const fields = Object.fromEntries(new FormData(form));
-        if (await save({ ...fields, projectId, assignee })) form.reset();
+        if (
+          await save({
+            ...fields,
+            projectId: projectId === 'none' ? '' : projectId,
+            assignee,
+          })
+        )
+          form.reset();
       }}
     >
       <FormError error={error} />
@@ -1402,7 +1522,11 @@ function TaskComposer({
         <Choice
           label="Project"
           value={projectId}
-          options={projects}
+          options={
+            allowNoProject
+              ? [{ id: 'none', name: 'No project' }, ...projects]
+              : projects
+          }
           onChange={setProjectId}
         />
       </Field>
@@ -1422,12 +1546,12 @@ function TaskComposer({
       <Button
         type="submit"
         className="cf-primary"
-        disabled={busy || !projectId}
+        disabled={busy || (!allowNoProject && !projectId)}
       >
         <Plus size={15} />
         Create task
       </Button>
-      {!projects.length && (
+      {!projects.length && !allowNoProject && (
         <p className="cf-form-hint">
           Create a project in this client space before adding follow-up tasks.
         </p>
@@ -1436,7 +1560,7 @@ function TaskComposer({
   );
 }
 
-function MeetingEditor({
+export function MeetingEditor({
   meeting,
   data,
   projects,
@@ -1455,11 +1579,14 @@ function MeetingEditor({
   openTask: (id: string) => void;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [draft, setDraft] = useState({ ...meeting });
-  const [saved, setSaved] = useState({ ...meeting });
-  const [tab, setTab] = useState(
-    meeting.status === 'Completed' ? 'notes' : 'prepare',
+  const draftScope = data.draftScope || '';
+  const [draft, setDraft] = useState(
+    () => readMeetingDraft(draftScope, meeting) || { ...meeting },
   );
+  const [saved, setSaved] = useState({ ...meeting });
+  const draftRef = useRef(draft);
+  const [tab, setTab] = useState('notes');
+  const [connection, setConnection] = useState('none');
   const [savedMessage, setSavedMessage] = useState('');
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   useEffect(() => {
@@ -1471,16 +1598,33 @@ function MeetingEditor({
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [dirty]);
   const update = (key: keyof Meeting, value: string) => {
-    setDraft((d) => ({ ...d, [key]: value }));
+    const next = { ...draftRef.current, [key]: value };
+    draftRef.current = next;
+    setDraft(next);
+    writeMeetingDraft(draftScope, next);
     onDirtyChange(true);
   };
   const save = async (status = draft.status) => {
-    const next = { ...draft, status };
+    const next = {
+      ...draft,
+      status,
+      ...(!meeting.spaceId && !meeting.prospectId
+        ? meetingConnection(connection)
+        : {}),
+    };
     if (await act({ type: 'meeting-edit', ...next })) {
       const result = { ...next, revision: next.revision + 1 };
-      setDraft(result);
+      const unchanged =
+        JSON.stringify(draftRef.current) === JSON.stringify(draft);
+      const latest = unchanged
+        ? result
+        : { ...draftRef.current, revision: result.revision };
+      draftRef.current = latest;
+      setDraft(latest);
+      if (unchanged) clearMeetingDraft(draftScope, meeting.id);
+      else writeMeetingDraft(draftScope, latest);
+      onDirtyChange(!unchanged);
       setSaved(result);
-      onDirtyChange(false);
       setSavedMessage(
         status === 'Completed'
           ? 'Meeting completed. Decisions are saved.'
@@ -1491,7 +1635,12 @@ function MeetingEditor({
     return false;
   };
   const followups = data.tasks.filter((t) => t.meetingId === meeting.id);
-  const history = data.spaceEvents.filter((e) => e.meetingId === meeting.id);
+  const history = data.spaceEvents
+    .filter((e) => e.meetingId === meeting.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
   return (
     <div className="cf-meeting-editor">
       <div className="cf-editor-heading">
@@ -1511,12 +1660,28 @@ function MeetingEditor({
           <TabsTrigger value="prepare">Prepare</TabsTrigger>
           <TabsTrigger value="notes">Notes & decisions</TabsTrigger>
           <TabsTrigger value="followups">
-            Follow-ups<span>{followups.length}</span>
+            Tasks<span>{followups.length}</span>
           </TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
       </Tabs>
       <FormError error={error} />
+      {draft.revision !== meeting.revision && dirty && (
+        <p role="alert">
+          This meeting has a newer saved version. Your draft is still here. Copy
+          your changes before reopening it.
+        </p>
+      )}
+      {!meeting.spaceId && !meeting.prospectId && (
+        <MeetingConnection
+          data={data}
+          value={connection}
+          onChange={(v) => {
+            setConnection(v);
+            onDirtyChange(true);
+          }}
+        />
+      )}
       {tab === 'prepare' && (
         <div className="cf-form">
           <Field label="Meeting title">
@@ -1547,20 +1712,29 @@ function MeetingEditor({
               placeholder="One discussion point per line"
             />
           </Field>
-          <div className="cf-meeting-context">
-            <Target size={17} />
-            <div>
-              <strong>Keep the client’s goal in view</strong>
-              <p>
-                {data.spaces.find((s) => s.id === meeting.spaceId)?.wants ||
-                  'Add the client’s goals in their brand brief.'}
-              </p>
+          {meeting.spaceId && (
+            <div className="cf-meeting-context">
+              <Target size={17} />
+              <div>
+                <strong>Keep the client’s goal in view</strong>
+                <p>
+                  {data.spaces.find((s) => s.id === meeting.spaceId)?.wants ||
+                    'Add the client’s goals in their brand brief.'}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
       {tab === 'notes' && (
         <div className="cf-form">
+          <Field label="Participants">
+            <Input
+              value={draft.participants || ''}
+              onChange={(e) => update('participants', e.target.value)}
+              maxLength={3000}
+            />
+          </Field>
           <Field label="Meeting notes">
             <Textarea
               rows={9}
@@ -1590,8 +1764,8 @@ function MeetingEditor({
       {tab === 'followups' && (
         <div className="cf-followups">
           <p>
-            These tasks also live in the project and on the responsible person’s
-            board.
+            These tasks stay connected to this meeting and the responsible
+            person’s board.
           </p>
           {followups.map((t) => (
             <button
@@ -1615,12 +1789,18 @@ function MeetingEditor({
           ))}
           <h3>Add a next step</h3>
           <TaskComposer
+            allowNoProject
             projects={projects}
             data={data}
             busy={busy}
             error=""
             save={(fields) =>
-              act({ type: 'create', ...fields, meetingId: meeting.id })
+              act({
+                type: 'create',
+                ...fields,
+                meetingId: meeting.id,
+                reviewRequired: 0,
+              })
             }
           />
         </div>
@@ -1699,10 +1879,12 @@ function MeetingEditor({
         <div>
           <Button
             variant="outline"
-            disabled={busy || !dirty || !draft.title.trim()}
+            disabled={
+              busy || (!dirty && connection === 'none') || !draft.title.trim()
+            }
             onClick={() => void save()}
           >
-            Save changes
+            Save notes
           </Button>
           {draft.status === 'Planned' && (
             <Button

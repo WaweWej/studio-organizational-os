@@ -1,5 +1,41 @@
 # Vault and file storage design
 
+## Private hosting and initial transfer
+
+Production uses Sites owner-only access plus dispatch-authenticated user IDs. The development fallback remains compiled out of production. D1 and R2 are bound to the existing site across deployments; deployments contain code and schema migrations, never local workspace state or credentials.
+
+The maintenance transfer endpoint is disabled without a secret runtime key, requires authenticated workspace context, rejects cross-origin requests, limits body/row sizes, and accepts only known tables and columns. It remaps organization IDs while preserving record IDs/history and refuses files/vault records. A guarded transaction checks that the target contains no work, imports all rows, and records a digest for retry deduplication. A failed import rolls back; a later differing import never overwrites existing work. Remove the secret and redeploy after the verified initial transfer. Snapshots stay in ignored local work/backups with restricted file permissions.
+
+
+## Meeting notes and connections
+
+Meeting creation, edits, task linking and legacy calendar attachment validate organization-scoped references and optimistic revisions. Task connections must match the meeting's prospect/client. A task can explicitly give context to an unconnected meeting. Creation/attachment/history use one guarded batch and a private fingerprint; calendar sources cannot be independently edited after linking. Meeting edits retain prior note/decision snapshots. Prospect conversion atomically transfers meeting/history client references, preserving record IDs and task/calendar links. Explicit client deletion also archives linked calendar sources. Notes and participants are ordinary workspace content, never vault secrets. First-capture and existing-meeting drafts use the same per-tab organization/member boundary as other drafts, with a seven-day recovery window; saved notes remain in D1.
+
+
+## Daily work and draft recovery
+
+Priority, waiting and scheduling commands restrict edits to the authenticated actor’s active tasks. Multi-task rescheduling validates every revision before any update and records history atomically. Planning dates do not rewrite deadlines. Existing tasks retain required review; explicit simple tasks may complete without review only before any review version exists.
+
+Capture drafts are stored in sessionStorage, keyed by server-provided organization/member identity. They recover within that tab for seven days, are not shared across tabs/devices, and are not suitable for credentials. File bodies and vault data never enter this cache. Captures retain retry IDs across reload. Browser storage failures retain the existing unsaved-change guard.
+
+## Sales conversion boundaries
+
+Stage changes never create clients. A separate sales-convert command requires Won, the current prospect revision, validated profile fields and an organization-scoped account lead. Confirmation, client creation/update and history are atomic; a private fingerprint deduplicates retries. Duplicate client names are rejected. Legacy linked clients require their current revision before profile updates. Converted prospects cannot be moved through the stage endpoint. Client removal clears the conversion link and marker atomically.
+
+## Client lifecycle boundaries
+
+Client removal and conversion are scoped to the authenticated organization and guarded by client revision. Removal receipts contain IDs, actor, action and timestamp only; dependent changes and removal commit atomically. Shared resource bodies are never deleted. Conversion preserves profile context in the destination prospect history and is refused when client meetings exist. The UI explicitly confirms removal of the profile and meeting history.
+
+## Daily plan boundaries
+
+Daily commitments validate all titles, dates/times, actor ownership, selected client/project consistency and referenced task revisions. New context, canonical tasks, history and receipts are written in one guarded batch. The webhook URL is server-only, restricted to hooks.slack.com over HTTPS with no redirects and bound to one configured organization. A plan's delivery claim prevents simultaneous posts; an unknown network outcome is not automatically repeated. Messages use Slack plain-text blocks so task text cannot create mentions or formatting instructions. `.dev.vars*` is ignored by Git. Tests use mocked Slack and an isolated local application/database; no production connection was enabled.
+
+## Task and calendar changes · 10 September 2026
+
+Archive, restore and delete are scoped to the authenticated organization and guarded by task revision. Deletion and dependent cleanup run in one atomic batch. Content-free task tombstones retain ID, actor, revision and time for retry safety; shared file bodies and source meeting/sales records are preserved. The board confirms permanent deletion. Archived tasks cannot be edited until restored.
+
+Calendar records validate dates, times and revisions on the server. Changes and history are atomic. Existing client-meeting moves use the meeting command/history boundary. No external invitations or messages are sent. Sample cleanup was local only, targeted exact IDs and retained an ignored local backup. New workspaces seed only the owner; test fixtures are isolated from user data.
+
 ## Current scope
 
 This is an implemented encryption prototype inside the private Studio pilot. It has not had an independent security assessment. The application currently has one real authenticated owner and sample team members; there is no real multi-user role or credential-sharing model yet. Local development has an explicitly development-only identity fallback. Do not expose the development server publicly.

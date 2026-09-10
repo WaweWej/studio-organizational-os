@@ -1272,3 +1272,8 @@
 .client-focus .cf-brand-copy > p {
   color: #606b54;
 }
+
+.spaces-heading { display:flex; align-items:baseline; gap:12px; margin:0 0 22px; }
+.spaces-heading h1 { margin:0; font:600 28px/1.2 var(--font-sans, sans-serif); letter-spacing:-.025em; }
+.spaces-heading > span { color:#687383; font-size:14px; }
+.spaces-empty { margin:28px 0; font-size:16px; color:#647083; }

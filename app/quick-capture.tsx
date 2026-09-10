@@ -1,4 +1,5 @@
 'use client';
+import { DraftCache } from '@/lib/draft-cache';
 import {
   commandQuery,
   commandSuggestions,
@@ -6,6 +7,8 @@ import {
   type DeskIntent,
 } from '@/lib/desk-intents';
 import ProjectCapture, { type ProjectDraft } from './project-capture';
+import DailyPlanCapture from './daily-plan-capture';
+import type { DailyPlanDraft } from '@/lib/daily-plan';
 import {
   useState,
   useEffect,
@@ -66,6 +69,8 @@ import {
   type MentionOption,
 } from '@/lib/task-capture';
 export type CaptureDraft = {
+  reviewRequired?: number;
+  request?: { fingerprint: string; id: string };
   text: string;
   pins: CaptureMention[];
   contextProject: string | null;
@@ -75,6 +80,7 @@ export type CaptureDraft = {
   meetingDate?: string;
   meetingTime?: string;
   project?: ProjectDraft;
+  daily?: DailyPlanDraft;
 };
 export default function QuickCapture({
   data,
@@ -132,9 +138,14 @@ export default function QuickCapture({
     [saving, setSaving] = useState(false),
     [optionsOpen, setOptionsOpen] = useState(false),
     [attempted, setAttempted] = useState(false);
+  const [reviewRequired, setReviewRequired] = useState(
+    initial?.reviewRequired ?? 0,
+  );
   const input = useRef<HTMLInputElement | HTMLTextAreaElement>(null),
     submitting = useRef(false),
-    request = useRef<{ fingerprint: string; id: string } | null>(null),
+    request = useRef<{ fingerprint: string; id: string } | null>(
+      initial?.request || null,
+    ),
     helpId = useId();
   const entry = interpretEntry(text, data, {
     kind,
@@ -222,6 +233,7 @@ export default function QuickCapture({
     drafts.set(draftKey, {
       ...drafts.get(draftKey),
       text,
+      reviewRequired,
       pins,
       contextProject,
       contextSpace,
@@ -248,6 +260,7 @@ export default function QuickCapture({
     target,
     meetingDate,
     meetingTime,
+    reviewRequired,
     focusTaskId,
     entry.kind,
     update,
@@ -257,6 +270,7 @@ export default function QuickCapture({
     if (enabled) input.current?.focus();
   }, [enabled]);
   useEffect(() => {
+    if (drafts instanceof DraftCache && drafts.available) return;
     if (!text.trim() && !drafts.get(draftKey)?.project) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
@@ -405,6 +419,7 @@ export default function QuickCapture({
           }
         : {
             type: 'quick-create',
+            reviewRequired,
             title: entry.title,
             spaceId: entry.spaceId || '',
             projectId: parsed.projectId || '',
@@ -415,6 +430,9 @@ export default function QuickCapture({
     if (request.current?.fingerprint !== fingerprint)
       request.current = { fingerprint, id: crypto.randomUUID() };
     const id = request.current.id;
+    const pendingDraft = drafts.get(draftKey);
+    if (pendingDraft)
+      drafts.set(draftKey, { ...pendingDraft, request: request.current });
     try {
       if (await act({ ...command, captureId: id })) {
         setSavedId(id);
@@ -423,6 +441,7 @@ export default function QuickCapture({
         setMeetingDate('');
         setMeetingTime('');
         setKind('auto');
+        setReviewRequired(0);
         setOptionsOpen(false);
         setText('');
         setPins([]);
@@ -431,6 +450,7 @@ export default function QuickCapture({
         setContextSpace(spaceId || null);
 
         request.current = null;
+        drafts.delete(draftKey);
       }
     } finally {
       submitting.current = false;
@@ -528,6 +548,34 @@ export default function QuickCapture({
     'aria-expanded': menuOpen || actionMenuOpen,
     onKeyDown: onWritingKey,
   };
+  if (entry.kind === 'daily' && slash === null)
+    return (
+      <DailyPlanCapture
+        data={data}
+        ready={ready}
+        busy={busy}
+        error={error}
+        source={text}
+        drafts={drafts}
+        draftKey={draftKey}
+        act={act}
+        back={() => {
+          setText('');
+          setKind('auto');
+          setReviewRequired(0);
+        }}
+        complete={(id) => {
+          setSavedId(id);
+          onCreated(id, 'Daily plan committed', 'daily');
+          setText('');
+          setKind('auto');
+          setReviewRequired(0);
+          setPins([]);
+          setTarget(null);
+          requestAnimationFrame(() => input.current?.focus());
+        }}
+      />
+    );
   if (entry.kind === 'project' && slash === null)
     return (
       <ProjectCapture
@@ -545,6 +593,7 @@ export default function QuickCapture({
         back={() => {
           setText('');
           setKind('auto');
+          setReviewRequired(0);
           setPins([]);
           setTarget(null);
           requestAnimationFrame(() => input.current?.focus());
@@ -556,6 +605,7 @@ export default function QuickCapture({
           setPins([]);
           setTarget(null);
           setKind('auto');
+          setReviewRequired(0);
           setOptionsOpen(false);
           setContextProject(projectId || null);
           setContextSpace(spaceId || null);
@@ -925,6 +975,15 @@ export default function QuickCapture({
         </div>
       ) : entry.kind === 'task' ? (
         <div className="capture-context" aria-label="Resolved task connections">
+          <label className="capture-chip">
+            <input
+              type="checkbox"
+              checked={reviewRequired === 1}
+              onChange={(e) => setReviewRequired(e.target.checked ? 1 : 0)}
+              disabled={busy}
+            />{' '}
+            Needs review
+          </label>
           <span className="capture-chip capture-assignee">
             <UserRound size={13} />
             {member?.name || 'You'}

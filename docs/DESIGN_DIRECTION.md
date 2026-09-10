@@ -1,5 +1,24 @@
 # Studio: an organization that keeps its context
 
+## Connected meeting notes · 10 September 2026
+
+A meeting is one canonical record across Sales, Calendar, Today, Tasks and a client space. Opening notes from any of those places edits that record. Prospects may have scheduled meetings before they become clients. When the user confirms a won prospect as a client, the same meetings and version history carry into its client space. Taking notes never requires inventing a follow-up task; an existing task can be linked explicitly. Keep meeting notes immediately visible, with preparation and connected tasks available in tabs. Meetings taking place today remain reachable after their start time. Save notes is explicit and drafts remain recoverable in the same tab.
+
+
+## Functional copy · 10 September 2026
+
+Remove decorative slogans, magazine labels and oversized generic mastheads from work navigation. Spaces uses a compact title, actual count, filters and plain empty state. Brand styling belongs to actual client content; no invented fallback taglines. Idle screens must not spend attention on flavor text. This supersedes the earlier editorial directory framing.
+
+## Prospect work and client correction · 10 September 2026
+
+Daily work can belong to a client, an internal project, or a sales prospect. The review makes that distinction explicit before creating records. Prospects stay in Sales; Won offers Create client record with a details and confirmation step. Client pages provide Move to Sales for mistaken client creation and Remove client with clear consequences; neither action deletes the canonical tasks or shared files.
+
+## Morning planning · 10 September 2026
+
+Desk supports a daily-plan module through the quiet Plan today control and the shared writing vocabulary. A multiline list becomes a reviewable set of canonical tasks with client/project context. Existing tasks can be reused; new clients/projects are named explicitly before commitment. Planning dates remain distinct from deadlines. Saving returns to writing with a receipt linking to Today.
+
+Today is the working daily board: committed tasks, unfinished carryover, due work, reviews and calendar meetings/events. Boards remains the full personal/team destination. Slack delivery is a separate, visible outcome of committing, never implied by a successful task save. The current interpreter is deterministic, and the pilot still has one real owner. See DAILY_PLANNING.md for behavior, configuration and verification.
+
 ## Product thesis
 
 Studio should reduce the effort between an intention and useful work. A person arrives with “get me ready for this meeting”, “what needs me?”, or “finish the launch video”. The workspace assembles the relevant records, offers a clear next action, and preserves the outcome in the same connected records.
@@ -76,7 +95,7 @@ The workspace still has one authenticated owner and sample colleagues. Real team
 
 “Sales meeting with "Acme", next step: calculate lead price” is interpreted as a prospect interaction with a linked task. Capture previews both outcomes. The server parses the sentence again, validates the date and next step, and saves prospect lookup/creation, conversation, task, and activity atomically. Case and whitespace normalized exact names reuse an existing prospect. Ambiguous fuzzy matching is intentionally avoided. Retrying the same capture does not duplicate effects.
 
-Prospects have their own pipeline stages and history; active clients retain their richer brand spaces. Sales stage changes do not alter task progress, and completing a next step does not advance a prospect. The next action is assigned to the authenticated actor, visible on their board, and linked back to the sales history. A won prospect does not automatically become an active client yet.
+Prospects have their own pipeline stages and history; active clients retain their richer brand spaces. Sales stage changes do not alter task progress, and completing a next step does not advance a prospect. The next action is assigned to the authenticated actor, visible on their board, and linked back to the sales history. Moving to Won changes only the sales stage. Create client record then opens a details form; explicit confirmation saves the client and removes the prospect from the pipeline. Canonical tasks and sales history remain connected and visible from the client.
 
 ## The screen that stays open
 
@@ -101,3 +120,15 @@ The input, interpretation, modular entry renderer, command validation and receip
 The Desk uses an action registry (`lib/desk-intents.ts`) shared by recognition and the slash menu. Type `/` or `/help` to see actions with examples; filter by name and select with arrows and Enter or Tab. Escape cancels the action query. Full slash commands such as `/deadline @Autumn launch @18/09` also work. Normal phrases (add new deadline, schedule a meeting, log progress, flag a blocker, change status, request review) resolve to the same intents.
 
 The convention is action + content, with @client / @project / @date for connections. Dates are day/month. Existing task updates can use the selected task or its exact quoted title. Users can finish an entry by choosing the missing target, date or status inside the page; they do not have to remember the full syntax. Required-field errors appear on a save attempt, not on every incomplete phrase. Unrecognized prose stays a note, and an unknown slash command requires a supported action or an explicit Note override.
+
+## Boards as a primary destination · 10 September 2026
+
+Boards has its own sidebar entry alongside Desk and Today. My board and Team board belong in that section, with a persistent scope in the URL. Today is the daily brief and links into Boards; it no longer contains the board views. Boards continue to use canonical tasks, capture and review workflows.
+
+## Real work and a two-week calendar · 10 September 2026
+
+New workspaces start empty. No sample tasks, clients, colleagues, resources or templates appear while loading or after sign-in. The owner remains available for assignment.
+
+Task card menus offer Archive and Delete alongside movement. Archive hides the task from active work and offers restoration through the board's Archive drawer. Delete requires confirmation and removes task-owned notes, reviews, receipts and links while preserving shared files and source meetings/sales conversations.
+
+The calendar shows 14 days in large day panels, with the complete day's entries visible. It combines canonical task/project deadlines and client meetings with manually entered events, meetings and deadlines. Click a day to add an entry with its date already selected. Existing work can be scheduled directly without creating a duplicate task. Timed entries show their time; task finish times can also be set in task details. Client meetings use local display of their stored timestamps; date-only deadlines and manually entered times use local wall-clock values. Events created in the calendar are internal records, not external invitations. Date editing and drag rescheduling retain validation, revisions and undo.

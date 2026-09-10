@@ -1177,3 +1177,233 @@
     transition: none !important;
   }
 }
+
+/* Two-week working calendar. Each day keeps its full list visible. */
+.workspace-content:has(.fortnight-calendar) {
+  background: #fff;
+  padding: 30px 28px;
+}
+.fortnight-calendar {
+  max-width: none;
+  color: #243042;
+}
+.fc-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+.fc-heading h1 {
+  font-size: 2.5rem;
+  letter-spacing: -0.07em;
+}
+.fc-heading p {
+  margin-top: 8px;
+  font-size: 1rem;
+  color: #596575;
+}
+.fc-controls,
+.fc-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.fc-filters {
+  margin-bottom: 22px;
+}
+.fc-filters [data-slot='select-trigger'] {
+  font-size: 0.875rem;
+  min-width: 140px;
+}
+.fc-completed {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.875rem;
+  margin: 0 12px;
+}
+.fc-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid #dfe4ec;
+  border-left: 1px solid #dfe4ec;
+}
+.fc-day {
+  min-width: 0;
+  min-height: 310px;
+  padding: 14px 10px;
+  border-right: 1px solid #dfe4ec;
+  border-bottom: 1px solid #dfe4ec;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.fc-weekend {
+  background: #fafbfc;
+}
+.fc-today {
+  background: #f4f7ff;
+  box-shadow: inset 0 3px #4263d4;
+}
+.fc-day > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  gap: 4px;
+}
+.fc-day > header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fc-day > header span {
+  font-size: 0.875rem;
+  color: #637085;
+}
+.fc-day > header strong {
+  font-size: 1.65rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.fc-day-entries {
+  display: grid;
+  gap: 10px;
+}
+.fc-entry {
+  width: 100%;
+  text-align: left;
+  padding: 12px 10px;
+  border: 1px solid #e1e6ef;
+  border-left: 3px solid var(--entry-color);
+  border-radius: 5px;
+  background: #fff;
+  overflow-wrap: anywhere;
+  display: grid;
+  gap: 7px;
+  box-shadow: 0 2px 5px #18264105;
+}
+.fc-entry:hover {
+  border-color: #8b9fc8;
+}
+.fc-entry-time {
+  font-size: 0.8125rem;
+  color: #596575;
+  line-height: 1.4;
+}
+.fc-entry strong {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.fc-entry small {
+  font-size: 0.8125rem;
+  color: #637085;
+}
+.fc-complete strong {
+  text-decoration: line-through;
+  color: #647083;
+}
+.fc-add-empty {
+  text-align: left;
+  flex: 1;
+  color: #65738a;
+  font-size: 0.875rem;
+  padding: 12px 0;
+  min-height: 140px;
+}
+.fc-add-empty:hover {
+  color: #284cab;
+}
+.fc-status {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+.fc-dialog {
+  max-width: 480px !important;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.fc-form {
+  display: grid;
+  gap: 18px;
+}
+.fc-form label {
+  display: grid;
+  gap: 7px;
+  font-size: 0.875rem;
+}
+.fc-date-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.fc-form input,
+.fc-form textarea {
+  font-size: 1rem;
+}
+.fc-form > button {
+  justify-self: start;
+}
+.fc-unscheduled {
+  display: grid;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.fc-unscheduled > button {
+  display: grid;
+  gap: 5px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e1e6ef;
+  text-align: left;
+}
+.fc-unscheduled strong {
+  font-size: 1rem;
+  font-weight: 500;
+}
+.fc-unscheduled small {
+  color: #596575;
+  font-size: 0.875rem;
+}
+@media (min-width: 1600px) {
+  .fc-day {
+    min-height: 360px;
+    padding: 18px 14px;
+  }
+}
+@media (max-width: 1200px) {
+  .fc-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .fc-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 760px) {
+  .fc-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .fc-day {
+    min-height: 280px;
+  }
+  .workspace-content:has(.fortnight-calendar) {
+    padding: 22px 14px;
+  }
+}
+@media (max-width: 420px) {
+  .fc-grid {
+    grid-template-columns: 1fr;
+  }
+  .fc-day {
+    min-height: 240px;
+  }
+  .fc-date-fields {
+    grid-template-columns: 1fr;
+  }
+}

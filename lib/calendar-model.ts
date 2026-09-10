@@ -3,7 +3,9 @@ import type { Workspace } from './model';
 
 export type DeadlineEntry = {
   key: string;
-  kind: 'project' | 'task';
+  kind: 'project' | 'task' | 'meeting' | 'event' | 'deadline';
+  source?: 'calendar' | 'meeting';
+  time?: string;
   id: string;
   title: string;
   due: string;
@@ -39,6 +41,7 @@ export function shiftMonth(date: Date, offset: number) {
 export function deadlineOrder(a: DeadlineEntry, b: DeadlineEntry) {
   return (
     (a.due || '9999').localeCompare(b.due || '9999') ||
+    (a.time || '').localeCompare(b.time || '') ||
     a.kind.localeCompare(b.kind) ||
     a.title.localeCompare(b.title) ||
     a.key.localeCompare(b.key)
@@ -78,6 +81,7 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
     };
   });
   for (const task of data.tasks) {
+    if (task.archived) continue;
     const project = task.projectId ? projects.get(task.projectId) : undefined;
     const prospect = data.prospects.find((p) => p.id === task.prospectId);
     const spaceId = taskSpaceId(data, task);
@@ -88,6 +92,7 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
       id: task.id,
       title: task.title,
       due: task.due,
+      time: task.dueTime || '',
       projectId: task.projectId,
       prospectId: task.prospectId || null,
       spaceId,
@@ -104,6 +109,59 @@ export function calendarEntries(data: Workspace): DeadlineEntry[] {
       stage: task.stage,
       description: task.description,
       revision: task.revision,
+    });
+  }
+  for (const meeting of data.meetings) {
+    if (meeting.status === 'Cancelled') continue;
+    const start = new Date(meeting.startsAt);
+    if (Number.isNaN(start.getTime())) continue;
+    const space = meeting.spaceId ? spaces.get(meeting.spaceId) : undefined;
+    const prospect = data.prospects.find((p) => p.id === meeting.prospectId);
+    entries.push({
+      key: 'meeting:' + meeting.id,
+      id: meeting.id,
+      kind: 'meeting',
+      source: 'meeting',
+      title: meeting.title,
+      due: dateKey(start),
+      time: `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`,
+      projectId: null,
+      spaceId: meeting.spaceId,
+      prospectId: meeting.prospectId,
+      client:
+        space?.name || (prospect ? prospect.name + ' · Prospect' : 'Meeting'),
+      color: space?.color || '#4263d4',
+      ownerId: space?.owner || prospect?.owner || null,
+      complete: meeting.status === 'Completed',
+      stage: meeting.status,
+      description: meeting.agenda,
+      revision: meeting.revision,
+    });
+  }
+  for (const event of data.calendarEvents || []) {
+    if (event.archived || event.meetingId) continue;
+    entries.push({
+      key: 'calendar:' + event.id,
+      id: event.id,
+      kind: event.kind,
+      source: 'calendar',
+      title: event.title,
+      due: event.date,
+      time: event.time,
+      projectId: null,
+      spaceId: null,
+      client: 'Workspace',
+      color: event.kind === 'deadline' ? '#a65a39' : '#4263d4',
+      ownerId: event.actor,
+      complete: false,
+      stage:
+        event.kind === 'meeting'
+          ? 'Meeting'
+          : event.kind === 'deadline'
+            ? 'Deadline'
+            : 'Event',
+      description: event.description,
+      revision: event.revision,
     });
   }
   return entries.sort(deadlineOrder);
@@ -133,8 +191,51 @@ export function filterDeadlines(
   );
 }
 
-export function deadlineCommand(entry: DeadlineEntry, due: string) {
+export function deadlineCommand(
+  entry: DeadlineEntry,
+  due: string,
+  time = entry.time || '',
+) {
+  if (entry.source === 'calendar')
+    return {
+      type: 'calendar-save',
+      id: entry.id,
+      revision: entry.revision,
+      title: entry.title,
+      kind: entry.kind,
+      date: due,
+      time,
+      description: entry.description,
+    };
+  if (entry.source === 'meeting') {
+    const date = localDate(due),
+      [hours, minutes] = time.split(':').map(Number);
+    date.setHours(hours, minutes, 0, 0);
+    if (
+      !due ||
+      !time ||
+      Number.isNaN(date.getTime()) ||
+      dateKey(date) !== due ||
+      date.getHours() !== hours ||
+      date.getMinutes() !== minutes
+    )
+      throw new Error(
+        'Choose a valid meeting time; this time may fall in a daylight-saving gap.',
+      );
+    return {
+      type: 'calendar-meeting-time',
+      id: entry.id,
+      revision: entry.revision,
+      startsAt: date.toISOString(),
+    };
+  }
   return entry.kind === 'task'
-    ? { type: 'deadline', id: entry.id, revision: entry.revision, due }
+    ? {
+        type: 'deadline',
+        id: entry.id,
+        revision: entry.revision,
+        due,
+        dueTime: time,
+      }
     : { type: 'project-deadline', id: entry.id, previous: entry.due, due };
 }

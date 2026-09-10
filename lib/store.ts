@@ -1,3 +1,5 @@
+import { changeDayWork } from './day-work-store';
+import { mutateClientLifecycle } from './client-lifecycle-store';
 import { mutateProjectCapture } from './project-capture-store';
 import { blockerRecipients, type CaptureEntry } from './entry-model';
 import { mutateEntry, captureInsert } from './entry-store';
@@ -6,7 +8,15 @@ import { mutateResource, upgradeResources } from './resource-store';
 import { mutateClient } from './client-store';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
-import { initialWorkspace, type Workspace, type Task } from './model';
+import { emptyWorkspace, type Workspace, type Task } from './model';
+import { mutateTaskLifecycle } from './task-lifecycle-store';
+import { commitDailyPlan } from './daily-plan-store';
+import {
+  deliverDailyPlan,
+  slackUrl,
+  type SlackConfig,
+} from './daily-plan-slack';
+import { mutateCalendar, timeValue } from './calendar-store';
 import {
   AppError,
   textValue,
@@ -17,6 +27,8 @@ import {
 } from './validation';
 
 const collections = [
+  'dailyPlans',
+  'calendarEvents',
   'captureEntries',
   'prospects',
   'prospectEvents',
@@ -54,6 +66,13 @@ function insert(
 ) {
   const fields = ['org', ...Object.keys(row)],
     values = [org, ...Object.values(row)];
+  if (table === 'tasks') {
+    return db
+      .prepare(
+        `INSERT OR IGNORE INTO tasks (${fields.map((k) => `"${k}"`).join(',')}) SELECT ${fields.map(() => '?').join(',')} WHERE NOT EXISTS (SELECT 1 FROM taskDeletions WHERE org=? AND id=?)`,
+      )
+      .bind(...values, org, (row as Task).id);
+  }
   const sql = `INSERT OR IGNORE INTO "${table}" (${fields.map((k) => `"${k}"`).join(',')}) ${guard ? `SELECT ${fields.map(() => '?').join(',')} WHERE EXISTS (SELECT 1 FROM tasks WHERE org=? AND id=? AND lastMutation=?)` : `VALUES (${fields.map(() => '?').join(',')})`}`;
   return db
     .prepare(sql)
@@ -89,8 +108,7 @@ async function seed(c: Context) {
       .first()
   )
     return;
-  const data = initialWorkspace();
-  data.members[0].name = c.name;
+  const data = emptyWorkspace(c.name);
   const statements: D1PreparedStatement[] = [
     c.db
       .prepare(
@@ -99,7 +117,7 @@ async function seed(c: Context) {
       .bind(c.org, 'Studio workspace', new Date().toISOString()),
   ];
   for (const table of collections) {
-    for (const row of data[table]) {
+    for (const row of data[table] || []) {
       const extra =
         table === 'reviews'
           ? {
@@ -126,18 +144,48 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
         .bind(c.org),
     ),
   );
-  const out: Record<string, unknown> = { currentMember: c.actor, demo: true };
+  const out: Record<string, unknown> = { environment: import.meta.env.DEV ? 'local' : 'hosted', currentMember: c.actor, draftScope: c.org + ':' + c.actor, demo: false };
   collections.forEach(
     (table, i) =>
       (out[table] = results[i].results.map((raw) => {
         const row = raw as Record<string, unknown>;
-        const { org, lastMutation, fileKey, fingerprint, ...record } = row;
+        const {
+          org,
+          lastMutation,
+          fileKey,
+          fingerprint,
+          deliveryClaim,
+          conversionFingerprint,
+          ...record
+        } = row;
+        void conversionFingerprint;
+        void deliveryClaim;
+        if (
+          table === 'dailyPlans' &&
+          record.deliveryStatus === 'sending' &&
+          Date.now() - Number(String(deliveryClaim).split(':')[0]) > 60000
+        ) {
+          record.deliveryStatus = 'unknown';
+          record.deliveryError =
+            'Delivery could not be confirmed. Check Slack before sending again.';
+        }
         void fingerprint;
         void org;
         void lastMutation;
         void fileKey;
         return record;
       })),
+  );
+  const allTasks = out.tasks as Task[];
+  out.slackConnected = !!slackUrl(env as unknown as SlackConfig, c.org);
+  out.calendarEvents = (
+    out.calendarEvents as NonNullable<Workspace['calendarEvents']>
+  ).filter((e) => !e.archived);
+  out.tasks = allTasks.filter((t) => !t.archived);
+  out.archivedTasks = allTasks.filter((t) => t.archived);
+  const activeIds = new Set((out.tasks as Task[]).map((t) => t.id));
+  out.notices = (out.notices as Workspace['notices']).filter((n) =>
+    activeIds.has(n.taskId),
   );
   return out as Workspace;
 }
@@ -186,6 +234,38 @@ export async function mutate(
   const type = textValue(input.type, 'Action', 40, true),
     now = new Date().toISOString(),
     nonce = crypto.randomUUID();
+  if (type === 'day-work') { await changeDayWork(c,input); return; }
+  if (type === 'daily-plan-commit') {
+    await commitDailyPlan(
+      c,
+      input,
+      await readWorkspace(c),
+      !!slackUrl(env as unknown as SlackConfig, c.org),
+    );
+    try {
+      await deliverDailyPlan(
+        c,
+        String(input.id),
+        env as unknown as SlackConfig,
+      );
+    } catch {
+      /* The plan is committed even if delivery bookkeeping is unavailable. */
+    }
+    return;
+  }
+  if (type === 'daily-plan-deliver') {
+    const id = textValue(input.id, 'Plan', 36, true);
+    await deliverDailyPlan(c, id, env as unknown as SlackConfig);
+    return;
+  }
+  if (['task-archive', 'task-restore', 'task-delete'].includes(type)) {
+    await mutateTaskLifecycle(c, input);
+    return;
+  }
+  if (type.startsWith('calendar-')) {
+    await mutateCalendar(c, input);
+    return;
+  }
   if (type === 'project-capture') {
     await mutateProjectCapture(c, input);
     return;
@@ -204,6 +284,10 @@ export async function mutate(
     type === 'blueprint-create'
   ) {
     await mutateResource(c, input);
+    return;
+  }
+  if (type === 'client-delete' || type === 'client-to-prospect') {
+    await mutateClientLifecycle(c, input);
     return;
   }
   if (
@@ -261,6 +345,10 @@ export async function mutate(
     );
     t.spaceId = projectId ? null : directSpaceId;
     t.due = dateValue(input.due ?? '');
+    t.plannedFor = dateValue(input.plannedFor ?? '');
+    t.dueTime = t.due ? timeValue(input.dueTime ?? '') : '';
+    if(input.reviewRequired !== undefined && ![0,1].includes(input.reviewRequired as number)) throw new AppError('Choose whether review is required.');
+    t.reviewRequired = input.reviewRequired === 0 ? 0 : 1;
     t.assignee = textValue(
       type === 'quick-create' ? c.actor : (input.assignee ?? c.actor),
       'Responsible person',
@@ -271,9 +359,9 @@ export async function mutate(
     const meetingId = textValue(input.meetingId ?? '', 'Meeting', 100) || null;
     if (meetingId) {
       const meeting = await c.db
-        .prepare('SELECT spaceId FROM meetings WHERE org=? AND id=?')
+        .prepare('SELECT spaceId,prospectId FROM meetings WHERE org=? AND id=?')
         .bind(c.org, meetingId)
-        .first<{ spaceId: string }>();
+        .first<{ spaceId: string | null; prospectId: string | null }>();
       if (!meeting) throw new AppError('Meeting not found.', 404);
       const project = projectId
         ? await c.db
@@ -281,19 +369,22 @@ export async function mutate(
             .bind(c.org, projectId)
             .first<{ spaceId: string }>()
         : null;
-      if (!project || project.spaceId !== meeting.spaceId)
-        throw new AppError(
-          'Choose a project belonging to this meeting’s client.',
-        );
+      if (projectId && (!project || !meeting.spaceId || project.spaceId !== meeting.spaceId))
+        throw new AppError('Choose a project belonging to this meeting’s client.');
+      if (directSpaceId && directSpaceId !== meeting.spaceId) throw new AppError('The task and meeting must have the same client.');
+      t.spaceId = projectId ? null : meeting.spaceId;
+      t.prospectId = meeting.prospectId;
       t.meetingId = meetingId;
     }
     const sameCapture = (existing: Task) =>
       existing.title === t.title &&
       existing.description === t.description &&
       existing.projectId === t.projectId &&
+      existing.meetingId === t.meetingId &&
+      (existing.prospectId || null) === (t.prospectId || null) &&
       existing.spaceId === t.spaceId &&
       existing.due === t.due &&
-      existing.assignee === t.assignee;
+      existing.assignee === t.assignee && (existing.reviewRequired ?? 1) === t.reviewRequired;
     if (type === 'quick-create') {
       const existing = await c.db
         .prepare('SELECT * FROM tasks WHERE org=? AND id=?')
@@ -408,24 +499,45 @@ export async function mutate(
     .bind(c.org, id)
     .first<Task>();
   if (!task) throw new AppError('Task not found.', 404);
+  if (task.archived)
+    throw new AppError('Restore this task before changing it.', 409);
   if (type === 'note') {
     const body = textValue(input.body, 'Note', 10000, true);
-    await c.db.batch([
-      insert(c.db, 'notes', c.org, {
-        id: nonce,
-        taskId: id,
-        body,
-        actor: c.actor,
-        createdAt: now,
-      }),
-      insert(c.db, 'activities', c.org, {
-        id: crypto.randomUUID(),
-        taskId: id,
-        body: 'Added a note',
-        actor: c.actor,
-        createdAt: now,
-      }),
+    const result = await c.db.batch([
+      c.db
+        .prepare(
+          'UPDATE tasks SET revision=revision+1,updatedAt=?,lastMutation=? WHERE org=? AND id=? AND revision=? AND archived=0',
+        )
+        .bind(now, nonce, c.org, id, task.revision),
+      insert(
+        c.db,
+        'notes',
+        c.org,
+        {
+          id: nonce,
+          taskId: id,
+          body,
+          actor: c.actor,
+          createdAt: now,
+        },
+        { id, nonce },
+      ),
+      insert(
+        c.db,
+        'activities',
+        c.org,
+        {
+          id: crypto.randomUUID(),
+          taskId: id,
+          body: 'Added a note',
+          actor: c.actor,
+          createdAt: now,
+        },
+        { id, nonce },
+      ),
     ]);
+    if (!result[0].meta.changes)
+      throw new AppError('This task changed. Refresh and try again.', 409);
     return;
   }
   const revision = revisionValue(input.revision);
@@ -497,6 +609,10 @@ export async function mutate(
     notify(task.reviewer, `Ready for review: ${task.title}`);
   };
   const complete = async () => {
+    if(task.reviewRequired === 0 && task.stage !== 'Review' && task.version === 0) {
+      if(task.stage==='Done') throw new AppError('The task is already complete.');
+      updates.stage='Done'; updates.delivery='Internal completion'; activity='Completed task'; return;
+    }
     const approved = await c.db
       .prepare(
         "SELECT id FROM reviews WHERE org=? AND taskId=? AND version=? AND decision='Approved'",
@@ -554,6 +670,9 @@ export async function mutate(
     );
   } else if (type === 'deadline') {
     updates.due = dateValue(input.due);
+    updates.dueTime = updates.due
+      ? timeValue(input.dueTime ?? task.dueTime ?? '')
+      : '';
     activity = updates.due
       ? 'Set the deadline to ' + updates.due
       : 'Cleared the deadline';
@@ -561,6 +680,9 @@ export async function mutate(
     updates.title = textValue(input.title, 'Task name', 180, true);
     updates.description = textValue(input.description, 'Description');
     updates.due = dateValue(input.due);
+    updates.dueTime = updates.due
+      ? timeValue(input.dueTime ?? task.dueTime ?? '')
+      : '';
     updates.blocked = textValue(input.blocked, 'Blocking reason', 500);
     updates.assignee = textValue(
       input.assignee,

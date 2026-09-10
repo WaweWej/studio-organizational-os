@@ -30,7 +30,9 @@ export type Space = {
 };
 export type Meeting = {
   id: string;
-  spaceId: string;
+  spaceId: string | null;
+  prospectId?: string | null;
+  participants?: string;
   title: string;
   startsAt: string;
   agenda: string;
@@ -42,7 +44,8 @@ export type Meeting = {
 };
 export type SpaceEvent = {
   id: string;
-  spaceId: string;
+  spaceId: string | null;
+  prospectId?: string | null;
   meetingId: string | null;
   body: string;
   snapshot: string;
@@ -57,6 +60,11 @@ export type Project = {
   due: string;
 };
 export type Task = {
+  plannedFor?: string;
+  focusFor?: string;
+  reviewRequired?: number;
+  dueTime?: string;
+  archived?: number;
   prospectId?: string | null;
   spaceId: string | null;
   id: string;
@@ -117,6 +125,11 @@ export type Document = {
   body: string;
 };
 export type Workspace = {
+  environment?: 'local' | 'hosted';
+  dailyPlans?: DailyPlan[];
+  slackConnected?: boolean;
+  calendarEvents?: CalendarEvent[];
+  archivedTasks?: Task[];
   captureEntries: CaptureEntry[];
   prospects: Prospect[];
   prospectEvents: ProspectEvent[];
@@ -137,8 +150,70 @@ export type Workspace = {
   tools: Tool[];
   documents: Document[];
   currentMember: string;
+  draftScope?: string;
   demo: boolean;
 };
+export type DailyPlan = {
+  id: string;
+  day: string;
+  actor: string;
+  sourceText: string;
+  summary: string;
+  createdAt: string;
+  deliveryStatus:
+    | 'not_connected'
+    | 'pending'
+    | 'sending'
+    | 'sent'
+    | 'failed'
+    | 'unknown';
+  deliveryError: string;
+};
+export type CalendarEvent = {
+  id: string;
+  meetingId?: string | null;
+  title: string;
+  kind: 'event' | 'meeting' | 'deadline';
+  date: string;
+  time: string;
+  description: string;
+  revision: number;
+  archived: number;
+  actor: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export function emptyWorkspace(name = 'You'): Workspace {
+  return {
+    members: [{ id: 'me', name, role: 'Workspace owner', color: '#6471bf' }],
+    tasks: [],
+    calendarEvents: [],
+    dailyPlans: [],
+    slackConnected: false,
+    archivedTasks: [],
+    spaces: [],
+    projects: [],
+    meetings: [],
+    spaceEvents: [],
+    notes: [],
+    activities: [],
+    reviews: [],
+    notices: [],
+    tools: [],
+    documents: [],
+    resources: [],
+    resourceLinks: [],
+    folders: [],
+    blueprints: [],
+    prospects: [],
+    prospectEvents: [],
+    captureEntries: [],
+    currentMember: 'me',
+    demo: false,
+  };
+}
+
+// Synthetic fixtures for model tests only. Runtime workspaces start empty.
 export function initialWorkspace(): Workspace {
   const now = new Date().toISOString();
   const members = [

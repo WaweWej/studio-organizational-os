@@ -1,5 +1,6 @@
+import { mutateMeeting } from './meeting-store';
 import type { Context } from './store';
-import type { Meeting, Space } from './model';
+import type { Space } from './model';
 import { AppError, dateValue, revisionValue, textValue } from './validation';
 
 function webUrl(value: unknown, label: string, image = false) {
@@ -22,18 +23,6 @@ function webUrl(value: unknown, label: string, image = false) {
   } catch {
     throw new AppError(`${label} must be a complete HTTPS address.`);
   }
-}
-
-function meetingTime(value: unknown) {
-  const raw = textValue(value, 'Meeting time', 40, true);
-  if (
-    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(raw) ||
-    Number.isNaN(Date.parse(raw)) ||
-    new Date(raw).toISOString() !== raw
-  ) {
-    throw new AppError('Choose a valid meeting date and time.');
-  }
-  return raw;
 }
 
 type Fields = Record<string, string | number | null>;
@@ -65,14 +54,14 @@ export async function mutateClient(c: Context, input: Record<string, unknown>) {
   const type = String(input.type);
   const id = textValue(input.id, 'Record', 100, true);
   const nonce = crypto.randomUUID();
-  const now = new Date().toISOString();
 
   if (type === 'client-project-deadline' || type === 'project-deadline') {
     const project = await c.db
       .prepare('SELECT spaceId,due FROM projects WHERE org=? AND id=?')
       .bind(c.org, id)
       .first<{ spaceId: string | null; due: string }>();
-    if (!project || (type === 'client-project-deadline' && !project.spaceId)) throw new AppError('Project not found.', 404);
+    if (!project || (type === 'client-project-deadline' && !project.spaceId))
+      throw new AppError('Project not found.', 404);
     const due = dateValue(input.due),
       previous = dateValue(input.previous);
     const result = await c.db
@@ -87,61 +76,7 @@ export async function mutateClient(c: Context, input: Record<string, unknown>) {
     return;
   }
 
-  if (type === 'meeting-edit') {
-    const meeting = await c.db
-      .prepare('SELECT * FROM meetings WHERE org=? AND id=?')
-      .bind(c.org, id)
-      .first<Meeting>();
-    if (!meeting) throw new AppError('Meeting not found.', 404);
-    const revision = revisionValue(input.revision);
-    const status = textValue(input.status, 'Meeting status', 20, true);
-    if (!['Planned', 'Completed', 'Cancelled'].includes(status))
-      throw new AppError('Choose a valid meeting status.');
-    const fields: Fields = {
-      title: textValue(input.title, 'Meeting title', 180, true),
-      startsAt: meetingTime(input.startsAt),
-      agenda: textValue(input.agenda, 'Agenda', 15000),
-      notes: textValue(input.notes, 'Meeting notes', 30000),
-      decisions: textValue(input.decisions, 'Decisions', 15000),
-      status,
-      revision: revision + 1,
-      updatedAt: now,
-      lastMutation: nonce,
-    };
-    const result = await c.db.batch([
-      c.db
-        .prepare(
-          `UPDATE meetings SET ${Object.keys(fields)
-            .map((k) => `"${k}"=?`)
-            .join(',')} WHERE org=? AND id=? AND revision=?`,
-        )
-        .bind(...Object.values(fields), c.org, id, revision),
-      event(
-        c,
-        meeting.spaceId,
-        id,
-        status !== meeting.status
-          ? `Marked “${fields.title}” ${status.toLowerCase()}`
-          : `Updated “${fields.title}”`,
-        {
-          title: meeting.title,
-          startsAt: meeting.startsAt,
-          agenda: meeting.agenda,
-          notes: meeting.notes,
-          decisions: meeting.decisions,
-          status: meeting.status,
-          revision: meeting.revision,
-        },
-        { table: 'meetings', id, nonce },
-      ),
-    ]);
-    if (!result[0].meta.changes)
-      throw new AppError(
-        'This meeting changed in another session. Your draft is still here; copy it before closing and reopening to refresh.',
-        409,
-      );
-    return;
-  }
+  if (type.startsWith('meeting-')) return mutateMeeting(c, input);
 
   const space = await c.db
     .prepare('SELECT * FROM spaces WHERE org=? AND id=?')
@@ -206,21 +141,6 @@ export async function mutateClient(c: Context, input: Record<string, unknown>) {
         'This client brief changed in another session. Your draft is still here; copy it before closing and reopening to refresh.',
         409,
       );
-    return;
-  }
-
-  if (type === 'meeting-create') {
-    const title = textValue(input.title, 'Meeting title', 180, true);
-    const startsAt = meetingTime(input.startsAt);
-    const agenda = textValue(input.agenda ?? '', 'Agenda', 15000);
-    await c.db.batch([
-      c.db
-        .prepare(
-          "INSERT INTO meetings (org,id,spaceId,title,startsAt,agenda,notes,decisions,status,revision,updatedAt) VALUES (?,?,?,?,?,?,'','','Planned',0,?)",
-        )
-        .bind(c.org, nonce, id, title, startsAt, agenda, now),
-      event(c, id, nonce, `Planned “${title}”`, { title, startsAt, agenda }),
-    ]);
     return;
   }
 

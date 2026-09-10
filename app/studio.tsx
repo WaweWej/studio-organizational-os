@@ -1,7 +1,10 @@
 'use client';
 import { taskSpaceId } from '@/lib/task-context';
+import { localDay } from '@/lib/workspace-brief';
 import WorkingDesk, { ConnectedNotes, CapturedNote } from './working-desk';
 import type { CaptureEntry } from '@/lib/entry-model';
+import { DraftCache } from '@/lib/draft-cache';
+import MeetingPanel, { type MeetingTarget } from './meeting-panel';
 import ClientFocus from './client-focus';
 import SalesPipeline from './sales-pipeline';
 import Today, { readableDate } from './today';
@@ -32,6 +35,7 @@ import {
 } from 'react';
 import {
   Sun,
+  Columns3,
   BookOpen,
   Layers,
   BriefcaseBusiness,
@@ -87,7 +91,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   stages,
-  initialWorkspace,
+  emptyWorkspace,
   type Workspace,
   type Task,
   type Member,
@@ -96,6 +100,7 @@ import {
 const navigation = [
   { id: 'desk', name: 'Desk', icon: PanelTop },
   { id: 'day', name: 'Today', icon: Sun },
+  { id: 'boards', name: 'Boards', icon: Columns3 },
   { id: 'spaces', name: 'Spaces', icon: BriefcaseBusiness },
   { id: 'sales', name: 'Sales', icon: Handshake },
   { id: 'work', name: 'Work', icon: Layers },
@@ -163,21 +168,19 @@ function Picker({
 }
 
 export default function Studio() {
-  const captureDrafts = useRef(new Map<string, CaptureDraft>());
+  const captureDrafts = useRef(new DraftCache<CaptureDraft>());
   const [capturedNoteId, setCapturedNoteId] = useState<string | null>(null);
   const [prospectId, setProspectId] = useState<string | null>(null);
   const [deskTaskId, setDeskTaskId] = useState<string | null>(null);
-  const [dayView, setDayView] = useState('brief');
   const [intentQuery, setIntentQuery] = useState('');
   const [briefSpaceId, setBriefSpaceId] = useState<string | null>(null);
-  const [meetingOpenVersion, setMeetingOpenVersion] = useState(0);
-  const [meetingToOpen, setMeetingToOpen] = useState<string | null>(null);
+  const [meetingTarget, setMeetingTarget] = useState<MeetingTarget | null>(null);
   const [captureKey, setCaptureKey] = useState(0);
   const [captureRequested, setCaptureRequested] = useState(0);
   const [taskFocus, setTaskFocus] = useState<'brief' | 'work' | undefined>(
     undefined,
   );
-  const [data, setData] = useState<Workspace>(initialWorkspace),
+  const [data, setData] = useState<Workspace>(emptyWorkspace),
     [ready, setReady] = useState(false),
     [page, setPage] = useState('desk'),
     [scope, setScope] = useState('mine'),
@@ -195,11 +198,16 @@ export default function Studio() {
   const refresh = useCallback(async () => {
     const r = await fetch('/api/workspace');
     if (r.status === 401) {
+      setReady(false);
+      captureDrafts.current.configure("locked", null);
       setNeedsSignIn(true);
       return;
     }
     const body = (await r.json()) as Workspace & { error?: string };
     if (!r.ok) throw new Error(body.error || 'Unable to load the workspace.');
+    let draftStorage: Storage | null = null;
+    try { draftStorage = window.sessionStorage; } catch { /* Recovery may be disabled by browser policy. */ }
+    captureDrafts.current.configure(body.draftScope || body.currentMember, draftStorage);
     setData(body);
     setReady(true);
     setNeedsSignIn(false);
@@ -224,6 +232,9 @@ export default function Studio() {
     window.addEventListener('keydown', onKey);
     const params = new URLSearchParams(window.location.search);
     if (pages.includes(params.get('view') || '')) setPage(params.get('view')!);
+    if (params.get('view') === 'boards') {
+      setScope(params.get('scope') === 'team' ? 'team' : 'mine');
+    }
     if (params.get('prospect')) {
       setPage('sales');
       setProspectId(params.get('prospect'));
@@ -249,7 +260,8 @@ export default function Studio() {
   useEffect(() => {
     if (
       page === 'desk' ||
-      (page === 'day' && dayView !== 'brief') ||
+      page === 'boards' ||
+      page === 'day' ||
       (page === 'work' && !!projectId) ||
       prospectId ||
       capturedNoteId ||
@@ -290,7 +302,6 @@ export default function Studio() {
     return () => window.removeEventListener('keydown', key);
   }, [
     page,
-    dayView,
     prospectId,
     capturedNoteId,
     projectId,
@@ -366,21 +377,20 @@ export default function Studio() {
     updateSpaceUrl(null);
     const url = new URL(window.location.href);
     url.searchParams.set('view', id);
+    url.searchParams.delete('scope');
+    if (id === 'boards') url.searchParams.set('scope', scope);
     url.searchParams.delete('project');
     url.searchParams.delete('prospect');
     url.searchParams.delete('desk');
     window.history.replaceState(null, '', url);
     setPage(id);
     setProspectId(null);
-    setMeetingToOpen(null);
-    if (id === 'day') setDayView('brief');
     setSpaceId(null);
     setProjectId(null);
     closeTask();
     setError('');
   };
   const space = (id: string) => {
-    setMeetingToOpen(null);
     updateSpaceUrl(id);
     const url = new URL(window.location.href);
     url.searchParams.set('view', 'spaces');
@@ -415,26 +425,32 @@ export default function Studio() {
     navigate('sales');
     selectProspect(id);
   };
-  const openMeeting = (clientId: string, meetingId: string) => {
-    space(clientId);
-    setMeetingToOpen(meetingId);
-    setMeetingOpenVersion((v) => v + 1);
+  const openMeeting = (_clientId: string | null, meetingId: string) => {
+    setMeetingTarget({meetingId});
+    setBriefSpaceId(null);
   };
   const openBoard = (mode = 'mine') => {
-    navigate('day');
-    setDayView('board');
+    navigate('boards');
     setScope(mode);
-  };
-  const changeDayView = (view: string) => {
-    setDayView(view);
     const url = new URL(window.location.href);
-    url.searchParams.delete('desk');
+    url.searchParams.set('scope', mode);
     window.history.replaceState(null, '', url);
   };
-  const openDesk = () => navigate('desk');
+  const openDailyPlan = () => {
+    const draft = captureDrafts.current.get('workspace');
+    if (!draft?.text.trim())
+      captureDrafts.current.set('workspace', {
+        text: 'Plan my day',
+        pins: [],
+        contextProject: null,
+        contextSpace: null,
+      });
+    navigate('desk');
+  };
   const openEntry = (entry: CaptureEntry) => {
     setCreate(false);
     if (entry.targetType === 'note') setCapturedNoteId(entry.id);
+    else if (entry.targetType === 'plan') navigate('day');
     else if (entry.targetType === 'meeting' && entry.spaceId)
       openMeeting(entry.spaceId, entry.targetId);
     else if (entry.targetType === 'project') project(entry.targetId);
@@ -447,20 +463,37 @@ export default function Studio() {
   const shown = data.tasks
     .filter(
       (t) =>
-        page !== 'day' || scope === 'team' || t.assignee === data.currentMember,
+        page !== 'boards' ||
+        scope === 'team' ||
+        t.assignee === data.currentMember,
     )
     .filter((t) => !projectId || t.projectId === projectId)
     .filter((t) => !spaceId || taskSpaceId(data, t) === spaceId)
     .sort((a, b) => a.position - b.position);
-  const board = (
+  const renderBoard = (tasks: Task[], personal = false) => (
     <WorkBoard
-      key={projectId || 'workspace'}
+      key={(data.draftScope || 'loading') + ':' + (projectId || 'workspace')}
       data={data}
-      tasks={shown}
+      tasks={tasks}
+      archivedTasks={(data.archivedTasks || []).filter(
+        (t) =>
+          (!projectId || t.projectId === projectId) &&
+          (!spaceId || taskSpaceId(data, t) === spaceId) &&
+          ((!personal && page !== 'boards') ||
+            (!personal && scope === 'team') ||
+            t.assignee === data.currentMember),
+      )}
       ready={ready}
       busy={busy}
       error={error}
-      act={act}
+      act={(command) =>
+        act(
+          page === 'day' &&
+            ['create', 'quick-create'].includes(String(command.type))
+            ? { ...command, plannedFor: localDay(new Date()) }
+            : command,
+        )
+      }
       openTask={openTask}
       projectId={projectId}
       captureRequested={captureRequested}
@@ -470,12 +503,14 @@ export default function Studio() {
         !notices &&
         !create &&
         !documentId &&
+        !capturedNoteId &&
         !briefSpaceId
       }
       onOpenEntry={openEntry}
       drafts={captureDrafts.current}
     />
   );
+  const board = renderBoard(shown);
   return (
     <ResourceProvider
       data={data}
@@ -563,7 +598,7 @@ export default function Studio() {
               </button>
               {page !== 'desk' && (
                 <span className="top-workspace-state">
-                  {data.demo ? 'Sample workspace' : 'Private workspace'}
+                  {data.environment === 'local' ? 'Local preview' : 'Private workspace'}
                 </span>
               )}
             </div>
@@ -574,33 +609,19 @@ export default function Studio() {
             }
           >
             <nav className="context-nav" aria-label="Workspace views">
-              {page === 'day' && (
+              {page === 'boards' && (
                 <>
                   <button
-                    className={dayView === 'brief' ? 'active' : ''}
-                    onClick={() => changeDayView('brief')}
-                  >
-                    Brief
-                  </button>
-                  <button
-                    className={
-                      dayView === 'board' && scope === 'mine' ? 'active' : ''
-                    }
-                    onClick={() => {
-                      changeDayView('board');
-                      setScope('mine');
-                    }}
+                    className={scope === 'mine' ? 'active' : ''}
+                    aria-current={scope === 'mine' ? 'page' : undefined}
+                    onClick={() => openBoard('mine')}
                   >
                     My board
                   </button>
                   <button
-                    className={
-                      dayView === 'board' && scope === 'team' ? 'active' : ''
-                    }
-                    onClick={() => {
-                      setDayView('board');
-                      setScope('team');
-                    }}
+                    className={scope === 'team' ? 'active' : ''}
+                    aria-current={scope === 'team' ? 'page' : undefined}
+                    onClick={() => openBoard('team')}
                   >
                     Team board
                   </button>
@@ -739,8 +760,10 @@ export default function Studio() {
                 Opening your workspace…
               </div>
             )}
-            {page === 'desk' && (
+            {page === 'desk' && ready && (
               <WorkingDesk
+                openMeeting={id=>setMeetingTarget({meetingId:id})}
+                key={data.draftScope || "loading"}
                 data={data}
                 ready={ready}
                 busy={busy}
@@ -751,7 +774,6 @@ export default function Studio() {
                 focusTaskId={deskTaskId}
                 setFocusTask={setDeskTaskId}
                 openTask={openTask}
-                openBrief={setBriefSpaceId}
                 enabled={
                   !selected &&
                   !create &&
@@ -762,37 +784,36 @@ export default function Studio() {
                 }
               />
             )}
-            {page === 'day' &&
-              (dayView === 'brief' ? (
-                <Today
-                  data={data}
-                  ready={ready}
-                  openTask={openTask}
-                  openBrief={setBriefSpaceId}
-                  openSpace={space}
-                  openIntent={openIntent}
-                  openDesk={openDesk}
-                  capture={() => capture()}
-                  openBoard={() => openBoard()}
-                  openCalendar={() => navigate('calendar')}
-                />
-              ) : (
-                <>
-                  <div className="board-page-heading">
-                    <div>
-                      <h1>
-                        {scope === 'team' ? 'Work, together.' : 'Your work.'}
-                      </h1>
-                      <p>Capture the next step. Keep everything connected.</p>
-                    </div>
-                    <span className="quiet-meta">
-                      {shown.filter((t) => t.stage !== 'Done').length} open
-                      tasks
-                    </span>
+            {page === 'day' && (
+              <Today
+                data={data}
+                error={error}
+                openMeeting={openMeeting}
+                ready={ready}
+                openTask={openTask}
+                openBrief={setBriefSpaceId}
+                openPlan={openDailyPlan}
+                renderBoard={(tasks) => renderBoard(tasks, true)}
+                act={act}
+                busy={busy}
+                openBoard={() => openBoard()}
+                openCalendar={() => navigate('calendar')}
+                openCalendarMeeting={id=>setMeetingTarget({calendarId:id})}
+              />
+            )}
+            {page === 'boards' && (
+              <>
+                <div className="board-page-heading">
+                  <div>
+                    <h1>{scope === 'team' ? 'Team board' : 'My board'}</h1>
                   </div>
-                  {board}
-                </>
-              ))}
+                  <span className="quiet-meta">
+                    {shown.filter((t) => t.stage !== 'Done').length} open tasks
+                  </span>
+                </div>
+                {board}
+              </>
+            )}
             {page === 'work' &&
               (projectId ? (
                 <>
@@ -880,6 +901,9 @@ export default function Studio() {
                 capture={capture}
                 act={act}
                 openTask={openTask}
+                openClient={space}
+                openMeeting={id=>setMeetingTarget({meetingId:id})}
+                planMeeting={prospectId=>setMeetingTarget({prospectId})}
               />
             )}
             {page === 'calendar' && (
@@ -892,13 +916,14 @@ export default function Studio() {
                 openTask={openTask}
                 openProject={project}
                 openSpace={space}
+                openMeeting={id=>setMeetingTarget({meetingId:id})}
+                openCalendarMeeting={id=>setMeetingTarget({calendarId:id})}
               />
             )}
             {page === 'spaces' &&
               (currentSpace ? (
                 <ClientFocus
-                  key={currentSpace.id + ':' + meetingOpenVersion}
-                  initialMeetingId={meetingToOpen}
+                  key={currentSpace.id}
                   space={currentSpace}
                   data={data}
                   busy={busy}
@@ -946,8 +971,7 @@ export default function Studio() {
                     </div>
                   ))}
                   <p className="muted small-text">
-                    Sample people. Workspace invitations come in a later
-                    milestone.
+                    Workspace invitations are not available yet.
                   </p>
                 </section>
               </div>
@@ -960,7 +984,7 @@ export default function Studio() {
                 openTools={() => navigate('tools')}
               />
             )}
-            <div
+            {(busy || message) && <div
               className={
                 'save-status' + (page === 'desk' ? ' desk-global-status' : '')
               }
@@ -981,13 +1005,14 @@ export default function Studio() {
                 <>
                   <span className="status-dot" />
                   {ready
-                    ? 'Sample data · saved in the workspace'
+                    ? 'Saved'
                     : 'Connecting to your workspace'}
                 </>
               )}
-            </div>
+            </div>}
           </main>
         </div>
+        {ready && meetingTarget && <MeetingPanel key={JSON.stringify(meetingTarget)+data.draftScope} target={meetingTarget} data={data} busy={busy} error={error} act={act} close={()=>setMeetingTarget(null)} openTask={openTask} />}
         <ContextBrief
           data={data}
           spaceId={briefSpaceId}
@@ -1024,6 +1049,7 @@ export default function Studio() {
                 act={act}
                 openProject={project}
                 openSpace={space}
+                openMeetingNotes={() => {closeTask();setMeetingTarget({taskId:currentTask.id});}}
               />
             )}
           </SheetContent>
@@ -1067,6 +1093,7 @@ export default function Studio() {
           openTask={openTask}
         />
         <IntentPalette
+          openMeeting={id=>setMeetingTarget({meetingId:id})}
           openEntry={openEntry}
           openSales={() => navigate('sales')}
           openProspect={openProspect}
@@ -1145,6 +1172,7 @@ function TaskDetail({
   act,
   openProject,
   openSpace,
+  openMeetingNotes,
 }: {
   openProspect: (id: string) => void;
   initialTab?: 'brief' | 'work';
@@ -1154,6 +1182,7 @@ function TaskDetail({
   act: (v: Record<string, unknown>) => Promise<boolean>;
   openProject: (id: string) => void;
   openSpace: (id: string) => void;
+  openMeetingNotes: () => void;
 }) {
   const [tab, setTab] = useState<string>(
       initialTab || (task.stage === 'Review' ? 'work' : 'brief'),
@@ -1181,6 +1210,7 @@ function TaskDetail({
       title: f.get('title'),
       description: f.get('description'),
       due: f.get('due'),
+      dueTime: f.get('dueTime'),
       blocked: f.get('blocked'),
       assignee,
       reviewer,
@@ -1211,7 +1241,8 @@ function TaskDetail({
         />
         <Avatar member={member} small />
         <span>{member?.name}</span>
-        <span className="quiet-meta">Version {task.version || '—'}</span>
+        <span className="quiet-meta">{task.reviewRequired===0 && task.version===0?'No review required':'Version '+(task.version || '—')}</span>
+        {task.reviewRequired===0 && task.version===0 && task.stage!=='Done' && <Button disabled={busy} onClick={()=>void cmd('complete')}>Complete task</Button>}
       </div>
       {task.blocked && (
         <div className="blocked-note">Blocked · {task.blocked}</div>
@@ -1225,7 +1256,7 @@ function TaskDetail({
       </Tabs>
       {tab === 'brief' && (
         <>
-          {prospect && (
+          {prospect && !prospect.convertedAt && (
             <section className="task-client-context">
               <header>
                 <strong>{prospect.name} · Prospect</strong>
@@ -1251,6 +1282,9 @@ function TaskDetail({
               <p>{space.brief}</p>
             </section>
           )}
+          <section className="task-client-context">
+            <header><strong>{data.meetings.find(m=>m.id===task.meetingId)?.title || 'Meeting'}</strong><button disabled={busy} onClick={openMeetingNotes}>{task.meetingId ? 'Open meeting notes' : 'Link meeting & take notes'} <ArrowUpRight size={13}/></button></header>
+          </section>
           <section className="task-read-brief">
             <p>
               {task.description ||
@@ -1264,8 +1298,7 @@ function TaskDetail({
               <div>
                 <dt>Reviewer</dt>
                 <dd>
-                  {data.members.find((m) => m.id === task.reviewer)?.name ||
-                    'Unassigned'}
+                  {task.reviewRequired===0 && task.version===0 ? 'Not required' : data.members.find((m) => m.id === task.reviewer)?.name || 'Unassigned'}
                 </dd>
               </div>
               <div>
@@ -1325,6 +1358,14 @@ function TaskDetail({
                   <label>
                     Due date
                     <Input name="due" type="date" defaultValue={task.due} />
+                  </label>
+                  <label>
+                    Finish by (optional)
+                    <Input
+                      name="dueTime"
+                      type="time"
+                      defaultValue={task.dueTime || ''}
+                    />
                   </label>
                   <label>
                     Blocking reason

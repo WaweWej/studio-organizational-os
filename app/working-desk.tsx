@@ -1,4 +1,5 @@
 'use client';
+import { DraftCache } from '@/lib/draft-cache';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArrowUpRight,
@@ -43,6 +44,7 @@ import { readableDate, useWorkspaceClock } from './today';
 import { taskSpaceId } from '@/lib/task-context';
 
 const entryIcons = {
+  daily: CheckCheck,
   note: FileText,
   task: Plus,
   meeting: CalendarDays,
@@ -65,7 +67,7 @@ export default function WorkingDesk({
   focusTaskId,
   setFocusTask,
   openTask,
-  openBrief,
+  openMeeting,
 }: {
   data: Workspace;
   ready: boolean;
@@ -78,11 +80,12 @@ export default function WorkingDesk({
   focusTaskId: string | null;
   setFocusTask: (id: string | null) => void;
   openTask: (id: string) => void;
-  openBrief: (id: string) => void;
+  openMeeting: (id: string) => void;
 }) {
   const now = useWorkspaceClock(),
     field = useRef<HTMLDivElement>(null);
   const [history, setHistory] = useState(false),
+    [planComposer, setPlanComposer] = useState(() => drafts instanceof DraftCache && drafts.lastKey === 'daily-planning' && !!drafts.get('daily-planning')?.daily?.text.trim()),
     [attentionOpen, setAttentionOpen] = useState(false),
     [query, setQuery] = useState(''),
     [limit, setLimit] = useState(20),
@@ -148,6 +151,23 @@ export default function WorkingDesk({
         </p>
         <div className="desk-quiet-tools">
           <button
+            disabled={!ready || busy}
+            aria-pressed={planComposer}
+            onClick={() => {
+              if (!planComposer && !drafts.get('daily-planning')?.text.trim())
+                drafts.set('daily-planning', {
+                  text: 'Plan my day',
+                  pins: [],
+                  contextProject: null,
+                  contextSpace: null,
+                });
+              setPlanComposer(!planComposer);
+            }}
+          >
+            <CheckCheck size={16} />
+            <span>{planComposer ? 'Back to writing' : 'Plan today'}</span>
+          </button>
+          <button
             aria-label="Open desk activity"
             onClick={() => setHistory(true)}
           >
@@ -168,6 +188,8 @@ export default function WorkingDesk({
       </header>
       <div className="desk-writing-surface" ref={field}>
         <QuickCapture
+          key={planComposer ? 'daily-planning' : 'workspace'}
+          draftId={planComposer ? 'daily-planning' : 'workspace'}
           variant="desk"
           focusTaskId={task?.id}
           onDraftChange={setDraftText}
@@ -242,7 +264,7 @@ export default function WorkingDesk({
       {nextMeeting && (
         <button
           className="desk-meeting-line"
-          onClick={() => openBrief(nextMeeting.spaceId)}
+          onClick={() => openMeeting(nextMeeting.id)}
         >
           <CalendarDays size={15} />
           <time>{readableDate(nextMeeting.startsAt, true)}</time>

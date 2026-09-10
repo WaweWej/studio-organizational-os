@@ -1,4 +1,3 @@
-import { starterTemplates } from './starter-templates';
 import type { Context } from './store';
 import type { Resource, ResourceTarget } from './resource-model';
 import { AppError, textValue, revisionValue } from './validation';
@@ -23,23 +22,6 @@ export async function upgradeResources(c: Context) {
         "INSERT OR IGNORE INTO resourceLinks (org,id,resourceId,targetType,targetId) SELECT org,'legacy-'||id,'tool-'||id,'project',projectId FROM tools WHERE org=? AND projectId<>''",
       )
       .bind(c.org),
-    ...starterTemplates.map((t) =>
-      c.db
-        .prepare(
-          "INSERT OR IGNORE INTO resources (org,id,title,kind,source,description,content,category,owner,createdAt,updatedAt) VALUES (?,?,?,'template','text',?,?,?,?,?,?)",
-        )
-        .bind(
-          c.org,
-          t.id,
-          t.title,
-          t.description,
-          t.content,
-          t.category,
-          c.actor,
-          now,
-          now,
-        ),
-    ),
     c.db
       .prepare(
         'INSERT INTO resourceUpgrades (org,version) VALUES (?,2) ON CONFLICT(org) DO UPDATE SET version=2',

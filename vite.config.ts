@@ -45,6 +45,9 @@ export default defineConfig(async () => {
   const { cloudflare } = await import('@cloudflare/vite-plugin');
 
   return {
+    // Test copies may share dependencies, but must not share optimizer output.
+    // Keep optimized packages under node_modules for Vinext's CJS transform.
+    cacheDir: process.env.STUDIO_TEST_STATE ? 'node_modules/.vite-studio-tests' : 'node_modules/.vite',
     css: { postcss: { plugins: [tailwindcss()] } },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
@@ -53,6 +56,11 @@ export default defineConfig(async () => {
       vinext(),
       sites(),
       cloudflare({
+        // Isolated end-to-end runs never use the owner's preview database.
+        persistState: process.env.STUDIO_TEST_STATE
+          ? { path: process.env.STUDIO_TEST_STATE }
+          : true,
+        inspectorPort: process.env.STUDIO_TEST_STATE ? false : undefined,
         viteEnvironment: { name: 'rsc', childEnvironments: ['ssr'] },
         config: localBindingConfig,
       }),

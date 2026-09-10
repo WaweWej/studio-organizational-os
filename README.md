@@ -4,6 +4,16 @@ A creative organization OS: a quiet Desk for capturing intentions, branded clien
 
 The product and engineering context travels with this repository. Codex reads [AGENTS.md](AGENTS.md); the accepted visual direction is in [docs/DESIGN_DIRECTION.md](docs/DESIGN_DIRECTION.md).
 
+## Online use and updates
+
+The live Studio site uses the existing private Sites project with persistent Cloudflare D1 data and R2 file storage. Sign in with the same ChatGPT account that owns the site. Local preview data is separate; the header labels it Local preview. Use the live URL for real work after the initial transfer.
+
+Publishing a new code version reuses the same site and database. Keep `.openai/hosting.json` and its project ID/binding names intact. Database changes use new, reviewed migrations; never reset the live database, replay sample seeds, or replace it with local test data. The pilot remains one owner; sharing the site does not yet create a shared multi-user organization.
+
+To make improvements, ask Codex to change Studio locally, verify the affected flow with isolated fixtures, then publish the update to the existing private site. GitHub stores the development source; Sites stores published versions. The deployment process applies pending schema migrations while retaining workspace records. Keep migrations compatible with already saved data.
+
+For a local backup run `python3 scripts/backup-workspace.py`. Backups and exports stay under ignored `work/`; never commit them. The one-time local-to-hosted transfer uses an authenticated, secret-gated endpoint and an atomic empty-target check. Its key is removed after the transfer. It is not part of ordinary updates. Files/vault records need a separately planned transfer; neither is present in the initial cutover.
+
 ## Continue on another computer
 
 1. Install Git, Node.js 24 and Codex. Sign in to the GitHub account that can access this private repository.
@@ -20,7 +30,7 @@ The product and engineering context travels with this repository. Codex reads [A
 3. In Codex, add the cloned `studio` folder as a local project. Open the local URL printed by the development server.
 4. Start with: **“Continue Studio. Read AGENTS.md and the latest design and progress documents, check the branch and remote for newer work, then help me with [your next change].”**
 
-The GitHub default branch points to the original active Studio development branch, so a normal clone starts with the current work. No Cloudflare or AI API key is needed for the local sample workspace.
+The GitHub default branch points to the original active Studio development branch, so a normal clone starts with the current work. No Cloudflare or AI API key is needed for the local workspace. New workspaces start empty, with only the owner account.
 
 ## Switch computers during development
 
@@ -45,9 +55,9 @@ The original PC must remain awake, online and running the app. A dedicated alway
 
 ## Code and workspace data are separate
 
-This repository shares the source, migrations, images and product context. Each fresh local clone creates its own sample workspace. Tasks and notes entered into a preview, uploaded files, encrypted vault entries and secrets stay in that preview's local `.wrangler/state` directory and are intentionally excluded from Git.
+This repository shares the source, migrations, images and product context. Each fresh local clone creates its own empty workspace. Tasks and notes entered into a preview, uploaded files, encrypted vault entries and secrets stay in that preview's local `.wrangler/state` directory and are intentionally excluded from Git.
 
-The existing computer's data is preserved. Use the same host through Remote if you need that data while developing elsewhere. Sharing live workspace data across independent computers requires a hosted application and a deliberate data transfer; that has not been enabled by sharing this repository. Unsaved browser drafts and this Codex transcript are not copied into Git.
+The existing computer's data is preserved. Use the same host through Remote if you need that data while developing elsewhere. The live Site shares saved work across your signed-in devices. A Git checkout still has its own local preview data; pulling code does not copy or update the live records. Unsaved browser drafts and this Codex transcript are not copied into Git.
 
 ## Commands
 
@@ -71,4 +81,4 @@ The local development identity is not production authentication. Keep the previe
 - [Decisions](docs/DECISIONS.md)
 - [Security and data boundaries](docs/SECURITY.md)
 
-The first pilot has one real owner and sample team members. Live AI, production third-party connectors, real team permissions and client sharing remain future work. The existing Sites registration is retained; a code push does not publish the app.
+The pilot has one real owner. Sample records and colleagues were removed from the local workspace; synthetic fixtures remain available only to tests. Live AI, production third-party connectors, real team permissions and client sharing remain future work. The existing Sites registration is retained; a code push does not publish the app.
