@@ -12,7 +12,7 @@ Publishing a new code version reuses the same site and database. Keep `.openai/h
 
 To make improvements, ask Codex to change Studio locally, verify the affected flow with isolated fixtures, then publish the update to the existing private site. GitHub stores the development source; Sites stores published versions. The deployment process applies pending schema migrations while retaining workspace records. Keep migrations compatible with already saved data.
 
-For a local backup, stop the preview and run `python3 scripts/backup-workspace.py`. Backups and exports stay under ignored `work/`; never commit them. The one-time local-to-hosted transfer uses an authenticated, secret-gated endpoint bound to the owner's workspace and an atomic empty-target check. Its key and target setting are removed after the transfer. It is not part of ordinary updates. Files/vault records need a separately planned transfer; neither is present in the initial cutover.
+For a local backup, stop the preview and run `python3 scripts/backup-workspace.py`. Backups and exports stay under ignored `work/`; never commit them. The initial local-to-hosted transfer used a temporary endpoint bound to the owner's workspace and an atomic empty-target check. The endpoint was removed from the application after the transfer; importing local data is not part of ordinary updates. Files/vault records need a separately planned transfer; neither was present in the initial cutover.
 
 ## Continue on another computer
 
