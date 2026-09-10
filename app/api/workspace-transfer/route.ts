@@ -27,7 +27,21 @@ export async function POST(request: Request) {
       throw new AppError('JSON is required.', 415);
     if (Number(request.headers.get('content-length') || 0) > 2000000)
       throw new AppError('Transfer too large.', 413);
-    const c = await context();
+    // A maintenance request has no browser identity. Bind its short-lived key
+    // to the exact organization already created by the owner's first sign-in.
+    const targetOrg = (env as unknown as { STUDIO_TRANSFER_ORG?: string })
+      .STUDIO_TRANSFER_ORG;
+    const c = targetOrg
+      ? { org: targetOrg, actor: 'me', name: 'Workspace transfer', db: env.DB }
+      : await context();
+    if (
+      targetOrg &&
+      !(await c.db
+        .prepare('SELECT id FROM organizations WHERE id=? AND EXISTS (SELECT 1 FROM members WHERE org=? AND id=?)')
+        .bind(targetOrg, targetOrg, 'me')
+        .first())
+    )
+      throw new AppError('Sign in to the destination workspace first.', 409);
     const raw = await request.text();
     if (raw.length > 2000000) throw new AppError('Transfer too large.', 413);
     let input: unknown;
