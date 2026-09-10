@@ -2,6 +2,8 @@
 
 ## Optional reviews and separate Calendar / Projects · 10 September 2026
 
+Published privately as version 4, source `4bc34fa37795d67c76b71364e24e48548c92313f`, successful deployment `appgdep_6aa2aaad34648191aae7a6f1afbd1a5c`. Existing DB/ASSETS bindings and all applied migrations are unchanged.
+
 This supersedes the earlier required-approval workflow. Done completes any task directly through the shared command boundary, including legacy review-required tasks and work with pending, approved or changes-requested versions. Completing closes pending requests and marks their request notices read atomically; actual approvals, feedback and snapshots remain history. Capture and daily planning no longer show a review-required switch or ordinary-task review badges. The legacy field remains stored only for capture compatibility and does not gate completion. No data migration or live record rewrite is needed.
 
 Dragging or selecting Review on a board or task opens an explicit reviewer choice. The request can review the task brief without a deliverable, creates one version snapshot and in-app notice for the selected other member, and checks organization membership. Only that reviewer can record a decision. Notification results are recipient-scoped. The one-owner pilot shows a clear unavailable state when there is no other member; real employee access is still future work.
