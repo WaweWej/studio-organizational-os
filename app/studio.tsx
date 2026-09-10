@@ -17,6 +17,7 @@ import {
   CollapsibleContent,
 } from '@/components/ui/collapsible';
 import WorkBoard from './work-board';
+import ReviewRequest from './review-request';
 import QuickCapture, { type CaptureDraft } from './quick-capture';
 import ClientDirectory from './client-directory';
 import SharedCalendar from './shared-calendar';
@@ -35,6 +36,7 @@ import {
 } from 'react';
 import {
   Sun,
+  CalendarDays,
   Columns3,
   BookOpen,
   Layers,
@@ -103,13 +105,13 @@ const navigation = [
   { id: 'boards', name: 'Boards', icon: Columns3 },
   { id: 'spaces', name: 'Spaces', icon: BriefcaseBusiness },
   { id: 'sales', name: 'Sales', icon: Handshake },
-  { id: 'work', name: 'Work', icon: Layers },
+  { id: 'work', name: 'Projects', icon: Layers },
+  { id: 'calendar', name: 'Calendar', icon: CalendarDays },
   { id: 'library', name: 'Library', icon: BookOpen },
   { id: 'blueprints', name: 'Systems', icon: Workflow },
 ];
 const pages = [
   ...navigation.map((n) => n.id),
-  'calendar',
   'tools',
   'insights',
   'organization',
@@ -117,7 +119,6 @@ const pages = [
 ];
 const parentPage = (page: string) =>
   ({
-    calendar: 'work',
     tools: 'library',
     insights: 'blueprints',
   })[page] || page;
@@ -627,23 +628,6 @@ export default function Studio() {
                   </button>
                 </>
               )}
-              {['work', 'calendar'].includes(page) && (
-                <>
-                  <button
-                    className={page === 'work' ? 'active' : ''}
-                    onClick={() => navigate('work')}
-                  >
-                    Projects
-                  </button>
-                  <button
-                    className={page === 'calendar' ? 'active' : ''}
-                    onClick={() => navigate('calendar')}
-                  >
-                    Shared calendar
-                  </button>
-                  <button onClick={() => openBoard('team')}>Team board</button>
-                </>
-              )}
               {['blueprints', 'insights'].includes(page) && (
                 <>
                   <button
@@ -692,7 +676,7 @@ export default function Studio() {
                     {currentProject?.name ||
                       {
                         day: 'My day',
-                        work: 'Work, together',
+                        work: 'Projects',
                         spaces: 'A space for every client',
                         blueprints: 'Process blueprints',
                         tools: 'Your tools',
@@ -704,7 +688,7 @@ export default function Studio() {
                     {currentProject?.description ||
                       {
                         day: 'Pick up where you left off.',
-                        work: 'Projects and the people moving them forward.',
+                        work: '',
                         spaces:
                           'Clients, owned platforms, and everything connected to them.',
                         blueprints:
@@ -1043,6 +1027,7 @@ export default function Studio() {
                 key={currentTask.id + ':' + (taskFocus || 'default')}
                 openProspect={openProspect}
                 initialTab={taskFocus}
+                error={error}
                 task={currentTask}
                 data={data}
                 busy={busy}
@@ -1166,6 +1151,7 @@ export default function Studio() {
 function TaskDetail({
   openProspect,
   initialTab,
+  error,
   task,
   data,
   busy,
@@ -1176,6 +1162,7 @@ function TaskDetail({
 }: {
   openProspect: (id: string) => void;
   initialTab?: 'brief' | 'work';
+  error: string;
   task: Task;
   data: Workspace;
   busy: boolean;
@@ -1188,7 +1175,7 @@ function TaskDetail({
       initialTab || (task.stage === 'Review' ? 'work' : 'brief'),
     ),
     [assignee, setAssignee] = useState(task.assignee),
-    [reviewer, setReviewer] = useState(task.reviewer),
+    [requestingReview, setRequestingReview] = useState(false),
     [feedback, setFeedback] = useState(''),
     [note, setNote] = useState('');
   const prospect = data.prospects.find((p) => p.id === task.prospectId);
@@ -1213,11 +1200,12 @@ function TaskDetail({
       dueTime: f.get('dueTime'),
       blocked: f.get('blocked'),
       assignee,
-      reviewer,
+      reviewer: task.reviewer,
     });
   };
   return (
     <div className="sheet-body">
+      {requestingReview && <ReviewRequest task={task} data={data} busy={busy} error={error} act={act} close={() => setRequestingReview(false)} />}
       <div className="task-breadcrumb">
         {space && (
           <button onClick={() => openSpace(space.id)}>{space.name}</button>
@@ -1236,13 +1224,13 @@ function TaskDetail({
         <Picker
           label="Task stage"
           value={task.stage}
-          onChange={(stage) => void cmd('move', { stage })}
+          onChange={(stage) => stage === 'Review' && task.stage !== 'Review' ? setRequestingReview(true) : void cmd('move', { stage })}
           items={stages.map((s) => ({ value: s, label: s }))}
         />
         <Avatar member={member} small />
         <span>{member?.name}</span>
-        <span className="quiet-meta">{task.reviewRequired===0 && task.version===0?'No review required':'Version '+(task.version || '—')}</span>
-        {task.reviewRequired===0 && task.version===0 && task.stage!=='Done' && <Button disabled={busy} onClick={()=>void cmd('complete')}>Complete task</Button>}
+        {task.version > 0 && <span className="quiet-meta">Version {task.version}</span>}
+        {task.stage !== 'Done' && <Button disabled={busy} onClick={() => void cmd('complete')}>Complete task</Button>}
       </div>
       {task.blocked && (
         <div className="blocked-note">Blocked · {task.blocked}</div>
@@ -1298,7 +1286,7 @@ function TaskDetail({
               <div>
                 <dt>Reviewer</dt>
                 <dd>
-                  {task.reviewRequired===0 && task.version===0 ? 'Not required' : data.members.find((m) => m.id === task.reviewer)?.name || 'Unassigned'}
+                  {task.stage === 'Review' ? data.members.find((m) => m.id === task.reviewer)?.name || 'Unassigned' : 'Not requested'}
                 </dd>
               </div>
               <div>
@@ -1337,18 +1325,6 @@ function TaskDetail({
                       label="Responsible"
                       value={assignee}
                       onChange={setAssignee}
-                      items={data.members.map((m) => ({
-                        value: m.id,
-                        label: m.name,
-                      }))}
-                    />
-                  </label>
-                  <label>
-                    Reviewer
-                    <Picker
-                      label="Reviewer"
-                      value={reviewer}
-                      onChange={setReviewer}
                       items={data.members.map((m) => ({
                         value: m.id,
                         label: m.name,
@@ -1454,30 +1430,30 @@ function TaskDetail({
           </form>
           <section className="review-panel">
             <h3>
-              {currentReview?.decision === 'Approved'
+              {task.stage === 'Done' ? 'Task completed' : currentReview?.decision === 'Approved'
                 ? 'Approved and ready for handoff'
                 : task.stage === 'Review'
-                  ? 'Ready for review'
-                  : 'When the work is ready'}
+                  ? task.reviewer === data.currentMember ? 'Ready for your review' : 'Review requested'
+                  : 'Request a review (optional)'}
             </h3>
             <p>
-              {currentReview?.decision === 'Approved'
+              {task.stage === 'Done' ? 'Previous review decisions are kept in the history.' : currentReview?.decision === 'Approved'
                 ? 'Approval is recorded. Delivery is a separate step.'
                 : task.stage === 'Review'
-                  ? 'Review this version, then approve it or explain what needs to change.'
-                  : 'Save the deliverable, then send this version to the reviewer.'}
+                  ? task.reviewer === data.currentMember ? 'Review this version, then approve it or explain what needs to change.' : 'Waiting for ' + (data.members.find(member => member.id === task.reviewer)?.name || 'the reviewer') + '.'
+                  : 'Choose a team member when you want feedback on this task.'}
             </p>
             {task.stage !== 'Review' && task.stage !== 'Done' && (
               <Button
-                disabled={busy || !task.deliverable.trim()}
-                onClick={() => void cmd('submit')}
+                disabled={busy}
+                onClick={() => setRequestingReview(true)}
               >
                 <ArrowUpRight size={15} />
-                Submit for review
+                Request review
               </Button>
             )}
             {task.stage === 'Review' &&
-              currentReview?.decision === 'Pending' && (
+              currentReview?.decision === 'Pending' && task.reviewer === data.currentMember && (
                 <>
                   <Textarea
                     placeholder="Feedback or requested changes…"

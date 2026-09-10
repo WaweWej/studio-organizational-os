@@ -12,7 +12,7 @@ Today shows committed work, deadlines due today, unfinished prior plans, ongoing
 
 ## Working through the day
 
-Use a task menu to choose up to three priorities, plan it for tomorrow with Undo, or record what it is waiting for. Finish day lets you choose remaining tasks to carry into tomorrow; deadlines are preserved. Reviews remain in attention even if planned later. New quick/daily tasks have a review choice: simple tasks can complete directly; tasks requiring review retain the versioned approval workflow. Existing tasks remain review-required.
+Use a task menu to choose up to three priorities, plan it for tomorrow with Undo, or record what it is waiting for. Finish day lets you choose remaining tasks to carry into tomorrow; deadlines are preserved. Reviews remain in attention even if planned later. Any task can move directly to Done. Request review is a separate voluntary action that selects another member and sends an in-app request. There is no review-required setting in daily planning or task capture. Existing review snapshots and decisions remain history when a task completes.
 
 ## Slack
 
@@ -28,6 +28,6 @@ A configured commitment claims its pending delivery and posts a plain-text summa
 
 `tests/daily-plan.mjs` uses a fresh in-memory SQLite schema and mocked delivery; it never calls Slack. It verifies parsing, context/task creation, deduplication, rollback, org-scoped webhook configuration, exclusive delivery claims and uncertain-response behavior.
 
-`tests/daily-plan-e2e.mjs` requires an isolated local copy on port 3001 with a fresh database. Set `STUDIO_TEST_STATE` to a dedicated path under `work/`, migrate that same path with Wrangler's `--persist-to`, and launch the isolated copy. Run `STUDIO_TEST_URL=http://localhost:3001 node --import ./tests/ts-loader.mjs tests/daily-plan-e2e.mjs`. It creates test records only there. Never point it at the user's preview or reuse the live `.wrangler/state` directory. It checks HTTP persistence from plan commitment through notes, deliverable submission, approval/completion, Today, calendar, stale conflicts, retries and organization isolation using the local test-auth cookie for the second identity.
+`tests/daily-plan-e2e.mjs` requires an isolated local copy on port 3001 with a fresh database. Set `STUDIO_TEST_STATE` to a dedicated path under `work/`, migrate that same path with Wrangler's `--persist-to`, and launch the isolated copy. Run `STUDIO_TEST_URL=http://localhost:3001 node --import ./tests/ts-loader.mjs tests/daily-plan-e2e.mjs`. It creates test records only there. Never point it at the user's preview or reuse the live `.wrangler/state` directory. It checks HTTP persistence from plan commitment through notes, deliverable drafts, direct completion, Today, calendar, stale conflicts, retries and organization isolation using the local test-auth cookie for the second identity. `tests/optional-review.mjs` exercises optional requests, selected-reviewer authorization, notifications and completion against isolated SQLite without a server.
 
 The working-day refinement was exercised in an isolated browser preview, including draft reload, commitment, task planning, waiting, meeting access and the full review/completion flow. See PROGRESS.md for verification boundaries.

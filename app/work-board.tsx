@@ -54,6 +54,7 @@ import { taskSpaceId } from '@/lib/task-context';
 import { relatedResources } from '@/lib/resource-model';
 import type { CaptureEntry } from '@/lib/entry-model';
 import QuickCapture, { type CaptureDraft } from './quick-capture';
+import ReviewRequest from './review-request';
 const stageIcons = [Circle, CircleDot, Clock3, CircleCheck];
 export default function WorkBoard({
   data,
@@ -85,6 +86,7 @@ export default function WorkBoard({
   drafts: Map<string, CaptureDraft>;
 }) {
   const [waiting, setWaiting] = useState<Task | null>(null);
+  const [reviewTask, setReviewTask] = useState<Task | null>(null);
   const [waitingText, setWaitingText] = useState('');
   const [undo, setUndo] = useState<Task | null>(null);
   const planTask = async (task: Task, mode: string) => {
@@ -168,10 +170,14 @@ export default function WorkBoard({
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [enabled, ready, archiveOpen, deleting]);
-  const move = (task: Task, stage: Stage) =>
-    void act({ type: 'move', id: task.id, revision: task.revision, stage });
+  const move = (task: Task, stage: Stage) => {
+    if (stage === task.stage) return;
+    if (stage === 'Review') setReviewTask(task);
+    else void act({ type: 'move', id: task.id, revision: task.revision, stage });
+  };
   return (
     <section className="workboard" aria-label="Task board">
+      {reviewTask && <ReviewRequest key={reviewTask.id} task={data.tasks.find(task => task.id === reviewTask.id) || reviewTask} data={data} busy={busy} error={error} act={act} close={() => setReviewTask(null)} />}
       {undo && (
         <output className="day-undo">
           Moved “{undo.title}” to tomorrow.{' '}
@@ -544,9 +550,6 @@ function BoardCard({
         <h3>{task.title}</h3>
         {task.focusFor === localDay(new Date()) && task.stage !== 'Done' && (
           <span className="work-card-priority">Today’s priority</span>
-        )}
-        {task.reviewRequired === 0 && task.version === 0 && (
-          <span className="work-card-simple">No review needed</span>
         )}
         <p>
           {project?.name ||

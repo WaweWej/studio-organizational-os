@@ -62,6 +62,7 @@ export type Project = {
 export type Task = {
   plannedFor?: string;
   focusFor?: string;
+  /** Legacy capture metadata; completion never depends on review. */
   reviewRequired?: number;
   dueTime?: string;
   archived?: number;

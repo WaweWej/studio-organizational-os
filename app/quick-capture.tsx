@@ -138,9 +138,7 @@ export default function QuickCapture({
     [saving, setSaving] = useState(false),
     [optionsOpen, setOptionsOpen] = useState(false),
     [attempted, setAttempted] = useState(false);
-  const [reviewRequired, setReviewRequired] = useState(
-    initial?.reviewRequired ?? 0,
-  );
+  const [reviewRequired, setReviewRequired] = useState(initial?.reviewRequired ?? 0);
   const input = useRef<HTMLInputElement | HTMLTextAreaElement>(null),
     submitting = useRef(false),
     request = useRef<{ fingerprint: string; id: string } | null>(
@@ -975,15 +973,6 @@ export default function QuickCapture({
         </div>
       ) : entry.kind === 'task' ? (
         <div className="capture-context" aria-label="Resolved task connections">
-          <label className="capture-chip">
-            <input
-              type="checkbox"
-              checked={reviewRequired === 1}
-              onChange={(e) => setReviewRequired(e.target.checked ? 1 : 0)}
-              disabled={busy}
-            />{' '}
-            Needs review
-          </label>
           <span className="capture-chip capture-assignee">
             <UserRound size={13} />
             {member?.name || 'You'}

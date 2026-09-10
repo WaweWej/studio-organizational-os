@@ -1,5 +1,15 @@
 # Studio implementation status
 
+## Optional reviews and separate Calendar / Projects · 10 September 2026
+
+This supersedes the earlier required-approval workflow. Done completes any task directly through the shared command boundary, including legacy review-required tasks and work with pending, approved or changes-requested versions. Completing closes pending requests and marks their request notices read atomically; actual approvals, feedback and snapshots remain history. Capture and daily planning no longer show a review-required switch or ordinary-task review badges. The legacy field remains stored only for capture compatibility and does not gate completion. No data migration or live record rewrite is needed.
+
+Dragging or selecting Review on a board or task opens an explicit reviewer choice. The request can review the task brief without a deliverable, creates one version snapshot and in-app notice for the selected other member, and checks organization membership. Only that reviewer can record a decision. Notification results are recipient-scoped. The one-owner pilot shows a clear unavailable state when there is no other member; real employee access is still future work.
+
+Projects and Calendar now have independent sidebar entries and selected states. The Work label and Projects/Calendar nested tabs were removed; existing project URLs remain valid. The Projects heading uses its plain name.
+
+Verification: the actual task command handler passes isolated SQLite tests for legacy/new completion, voluntary requests without deliverables, one recipient notice, correct reviewer authorization, closing pending requests, preserved approval/feedback snapshots, repeated moves, stale and cross-organization writes, and atomic rollback. Daily planning, day-work, task lifecycle and Desk intent regressions pass, as do TypeScript and the production build (existing chunk-size warning). Focused lint passes for the changed capture, board, review and server modules; Studio's existing compiler/ref, label, link and deprecated-event findings remain. The old workflow test entry point now runs the isolated suite, and the HTTP daily-plan suite was updated to direct completion but was not rerun. No browser interaction QA or mutations to live work records were performed.
+
 ## Persistent private hosting · 10 September 2026
 
 Published [Studio online](https://studio-organizational-os.gwej123.chatgpt.site) using the existing owner-only Sites project with persistent DB/ASSETS bindings. The final live version is 3, source commit `0d92c8925ffce994070d2bba160d29979080f3e5`, successful deployment `appgdep_6aa2a697b7548191b1eb01fad20f739d`, environment revision 3. The initial transfer used version 2. All 16 migrations applied successfully. Private access is restricted to the connected owner; the owner completed browser sign-in. The local preview is stopped and the live site is the destination for real work.

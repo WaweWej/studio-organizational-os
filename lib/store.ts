@@ -185,7 +185,7 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
   out.archivedTasks = allTasks.filter((t) => t.archived);
   const activeIds = new Set((out.tasks as Task[]).map((t) => t.id));
   out.notices = (out.notices as Workspace['notices']).filter((n) =>
-    activeIds.has(n.taskId),
+    activeIds.has(n.taskId) && n.recipient === c.actor,
   );
   return out as Workspace;
 }
@@ -581,9 +581,13 @@ export async function mutate(
         guard,
       ),
     );
-  const submit = () => {
-    canSubmit(task);
+  const submit = async () => {
+    const reviewer = textValue(input.reviewer ?? task.reviewer, 'Reviewer', 100, true);
+    canSubmit({ ...task, reviewer });
+    if (reviewer === c.actor) throw new AppError('Choose another team member to review this task.');
+    await exists(c, 'members', reviewer);
     updates.stage = 'Review';
+    updates.reviewer = reviewer;
     updates.version = task.version + 1;
     updates.delivery = 'Not configured';
     activity = `Submitted version ${task.version + 1} for review`;
@@ -597,37 +601,31 @@ export async function mutate(
           id: crypto.randomUUID(),
           taskId: id,
           version: task.version + 1,
-          reviewer: task.reviewer,
+          reviewer,
           decision: 'Pending',
           feedback: '',
-          snapshot: task.deliverable,
+          snapshot: task.deliverable.trim() || task.description.trim() || task.title,
           createdAt: now,
         },
         guard,
       ),
     );
-    notify(task.reviewer, `Ready for review: ${task.title}`);
+    notify(reviewer, `Ready for review: ${task.title}`);
   };
-  const complete = async () => {
-    if(task.reviewRequired === 0 && task.stage !== 'Review' && task.version === 0) {
-      if(task.stage==='Done') throw new AppError('The task is already complete.');
-      updates.stage='Done'; updates.delivery='Internal completion'; activity='Completed task'; return;
-    }
-    const approved = await c.db
-      .prepare(
-        "SELECT id FROM reviews WHERE org=? AND taskId=? AND version=? AND decision='Approved'",
-      )
-      .bind(c.org, id, task.version)
-      .first();
-    if (!approved)
-      throw new AppError(
-        'Approve the current deliverable in Work & review before completing the task.',
-      );
+  const complete = () => {
     if (task.stage === 'Done')
       throw new AppError('The task is already complete.');
     updates.stage = 'Done';
     updates.delivery = 'Internal completion';
-    activity = 'Completed internal work; no external delivery was sent';
+    activity = task.stage === 'Review' ? 'Completed task and closed the review request' : 'Completed task';
+    // Completion closes a pending request without claiming the work was approved.
+    // Existing decisions and their version snapshots remain in the history.
+    secondary.push(
+      c.db.prepare(`UPDATE reviews SET decision='Superseded' WHERE org=? AND taskId=? AND decision='Pending' AND ${guardSql}`)
+        .bind(c.org, id, c.org, id, nonce),
+      c.db.prepare(`UPDATE notices SET read=1 WHERE org=? AND taskId=? AND body LIKE 'Ready for review:%' AND ${guardSql}`)
+        .bind(c.org, id, c.org, id, nonce),
+    );
   };
   if (type === 'progress' || type === 'blocker') {
     if (!capture) throw new AppError('Record this update through capture.');
@@ -702,8 +700,8 @@ export async function mutate(
     const stage = stageValue(input.stage);
     if (stage === task.stage && !capture) return;
     if (stage === task.stage) activity = 'Confirmed status: ' + stage;
-    else if (stage === 'Review') submit();
-    else if (stage === 'Done') await complete();
+    else if (stage === 'Review') await submit();
+    else if (stage === 'Done') complete();
     else {
       updates.stage = stage;
       if (task.stage === 'Review' || task.stage === 'Done') {
@@ -719,14 +717,16 @@ export async function mutate(
     updates.stage = task.stage === 'Review' ? 'Doing' : task.stage;
     updates.delivery = 'Not configured';
     invalidate();
-    activity = 'Saved the deliverable draft; a new review is required';
-  } else if (type === 'submit') submit();
+    activity = 'Saved the deliverable draft';
+  } else if (type === 'submit') await submit();
   else if (type === 'review') {
     const decision = textValue(input.decision, 'Decision', 30, true);
     if (!['Approved', 'Changes requested'].includes(decision))
       throw new AppError('Choose an approval or changes requested.');
     if (task.stage !== 'Review')
       throw new AppError('This task is not in review.');
+    if (task.reviewer !== c.actor)
+      throw new AppError('Only the requested reviewer can record a review decision.', 403);
     const pending = await c.db
       .prepare(
         "SELECT id FROM reviews WHERE org=? AND taskId=? AND version=? AND decision='Pending'",
@@ -751,7 +751,7 @@ export async function mutate(
     updates.stage = decision === 'Approved' ? 'Review' : 'Doing';
     activity = `${decision} for version ${task.version}`;
     notify(task.assignee, `${decision}: ${task.title}`);
-  } else if (type === 'complete') await complete();
+  } else if (type === 'complete') complete();
   else throw new AppError('Unknown action.');
   if (capture) {
     secondary.push(

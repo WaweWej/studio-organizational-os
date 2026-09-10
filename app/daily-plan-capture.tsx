@@ -194,10 +194,6 @@ export default function DailyPlanCapture({
                       ? ' · ' +
                         data.projects.find((p) => p.id === item.projectId)?.name
                       : ''}
-                    {' · '}
-                    {item.reviewRequired === 0
-                      ? 'No review'
-                      : 'Review required'}
                     {item.due ? ' · Due ' + item.due : ''} · Edit details
                   </summary>
                   <div className="daily-plan-connections">
@@ -379,19 +375,6 @@ export default function DailyPlanCapture({
                       </>
                     )}
                   </div>
-                  <label className="daily-review-choice">
-                    <input
-                      type="checkbox"
-                      checked={item.reviewRequired !== 0}
-                      disabled={busy || !!item.taskId}
-                      onChange={(e) =>
-                        edit(index, {
-                          reviewRequired: e.target.checked ? 1 : 0,
-                        })
-                      }
-                    />{' '}
-                    Requires deliverable review before completion
-                  </label>
                   <div className="daily-plan-dates">
                     <label htmlFor={'daily-due-' + index}>
                       Deadline (optional)

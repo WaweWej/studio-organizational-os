@@ -119,13 +119,9 @@ const action = async (type, extra = {}) => {
 };
 await action('note', { body: 'A decision attached to this work.' });
 await action('deliverable', { body: 'First version of the copy.' });
-await action('submit');
-assert(buildDailyBrief(data, now).reviews.some((t) => t.id === task.id));
-await action('review', {
-  decision: 'Approved',
-  feedback: 'Approved for the local test.',
-});
 await action('complete');
+assert.equal(data.tasks.find(t => t.id === task.id).stage, 'Done');
+assert(!data.reviews.some(review => review.taskId === task.id));
 assert(!buildDailyBrief(data, now).carryover.some((t) => t.id === task.id));
 const next = new Date(now);
 next.setDate(next.getDate() + 1);
@@ -168,5 +164,5 @@ await request(
   true,
 );
 console.log(
-  'PASS: real HTTP daily commit → canonical clients/projects/tasks → Today → carryover → notes/deliverable/review/approval/completion → meetings/calendar; retries, stale atomicity and tenant isolation.',
+  'PASS: real HTTP daily commit → canonical clients/projects/tasks → Today → carryover → notes/deliverable/direct completion → meetings/calendar; retries, stale atomicity and tenant isolation.',
 );

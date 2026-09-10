@@ -1,5 +1,11 @@
 # Studio: an organization that keeps its context
 
+## Optional review and direct navigation · 10 September 2026
+
+Done completes any task immediately, including older tasks and tasks with a pending or previous review. Approval is never a prerequisite for completion. Review is an explicit request to another team member, selected when moving to Review or choosing Request review. A deliverable is optional; the current task brief can be reviewed. Requests create an in-app notification for that reviewer and retain version snapshots. Completion closes pending requests without manufacturing an approval or erasing previous decisions. No review-required switch appears during task capture or daily planning. The current owner-only pilot explains when no other reviewer is available.
+
+Projects and Calendar are independent sidebar destinations with their own selected state and heading. Existing project URLs remain valid; Calendar is no longer grouped beneath Work.
+
 ## Connected meeting notes · 10 September 2026
 
 A meeting is one canonical record across Sales, Calendar, Today, Tasks and a client space. Opening notes from any of those places edits that record. Prospects may have scheduled meetings before they become clients. When the user confirms a won prospect as a client, the same meetings and version history carry into its client space. Taking notes never requires inventing a follow-up task; an existing task can be linked explicitly. Keep meeting notes immediately visible, with preparation and connected tasks available in tabs. Meetings taking place today remain reachable after their start time. Save notes is explicit and drafts remain recoverable in the same tab.

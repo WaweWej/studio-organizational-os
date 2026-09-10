@@ -16,7 +16,7 @@ Meeting creation, edits, task linking and legacy calendar attachment validate or
 
 ## Daily work and draft recovery
 
-Priority, waiting and scheduling commands restrict edits to the authenticated actor’s active tasks. Multi-task rescheduling validates every revision before any update and records history atomically. Planning dates do not rewrite deadlines. Existing tasks retain required review; explicit simple tasks may complete without review only before any review version exists.
+Priority, waiting and scheduling commands restrict edits to the authenticated actor’s active tasks. Multi-task rescheduling validates every revision before any update and records history atomically. Planning dates do not rewrite deadlines. All tasks can complete without approval. Optional review requests validate another member in the same organization, notify that reviewer, and preserve the current deliverable or task brief as a version snapshot. Only the requested reviewer may record a decision. Completion atomically supersedes pending reviews and clears their unread request notices while retaining genuine prior decisions. Workspace notification results are scoped to the current recipient.
 
 Capture drafts are stored in sessionStorage, keyed by server-provided organization/member identity. They recover within that tab for seven days, are not shared across tabs/devices, and are not suitable for credentials. File bodies and vault data never enter this cache. Captures retain retry IDs across reload. Browser storage failures retain the existing unsaved-change guard.
 
