@@ -691,15 +691,13 @@ export default function Studio() {
                   <p className="subtitle">
                     {currentProject?.description ||
                       {
-                        day: 'Pick up where you left off.',
+                        day: '',
                         work: '',
                         spaces:
                           'Clients, owned platforms, and everything connected to them.',
-                        blueprints:
-                          'Understand the journey. Know what connects.',
-                        tools: 'Every tool has a purpose and a place.',
-                        insights:
-                          'Understand what is happening, with evidence.',
+                        blueprints: '',
+                        tools: '',
+                        insights: '',
                         organization:
                           'The practical things, in one shared place.',
                       }[page]}

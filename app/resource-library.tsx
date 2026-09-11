@@ -620,9 +620,6 @@ export default function ResourceLibrary({
     >
       <header className="library-heading">
         <div>
-          <p className="eyebrow">
-            {kind === 'tool' ? 'THE STUDIO TOOLBOX' : 'THE SHARED COLLECTION'}
-          </p>
           <h1>
             {kind === 'tool' ? 'Made to make things.' : 'Everything, at hand.'}
           </h1>

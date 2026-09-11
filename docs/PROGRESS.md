@@ -296,3 +296,22 @@ recurring.mjs exercises the real command boundary in isolated SQLite for
 spawn-once semantics, chain lineage, editable validation, meeting
 materialization idempotence and tenant isolation. The full regression sweep,
 TypeScript, focused lint and the production build pass.
+
+## A quieter surface · 11 September 2026
+
+A fresh visual pass across every view removed flavor text that repeated what
+navigation or nearby lines already say: the Library's eyebrow labels, the
+poster subtitles on Today, Processes, Tools and Insights, the client hero's
+"Your client workspace" badge (the demo-mode "Sample brand" label remains
+informative and stays), and the client tab headings now say Meetings and
+Brand & context plainly, matching the existing plain Projects heading. The
+editorial lines that carry information were kept.
+
+The pass also surfaced accumulated verification residue in the local sample
+workspace: suites write cleanup SQL brooms that had not been applied, and
+client deletion deliberately detaches projects rather than destroying work,
+so the client-create suite now writes its own broom for the projects it
+creates, records carry the [Verification] prefix, and the local workspace was
+swept clean. Detached projects presenting as Internal after a client is
+removed is recorded here as a product question for later: they may deserve a
+"formerly of" label or an archive.

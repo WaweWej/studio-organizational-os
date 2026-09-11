@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 // Client creation: explicit creation from Spaces and named clients from the
 // project form. Requires the running local preview on port 5173. All records
@@ -15,6 +16,7 @@ const api = async (body) => {
 const uuid = () => crypto.randomUUID();
 
 const clientId = uuid();
+const projectIds = [];
 const removeClient = async (id) => {
   const read = await fetch(base + '/api/workspace');
   const data = await read.json();
@@ -56,11 +58,12 @@ try {
 
   // The project form can name a new client; both are created atomically.
   const captureId = uuid();
+  projectIds.push(captureId);
   const project = await api({
     type: 'project-capture',
     captureId,
     captureText: 'create new project',
-    name: 'Test Alpha Launch',
+    name: '[Verification] Alpha launch',
     description: '',
     spaceId: '',
     newClient: 'Test Client Beta',
@@ -75,11 +78,12 @@ try {
 
   // Naming an existing client reuses it (planning semantics), case-insensitive.
   const secondCapture = uuid();
+  projectIds.push(secondCapture);
   const reuse = await api({
     type: 'project-capture',
     captureId: secondCapture,
     captureText: 'create new project',
-    name: 'Test Alpha Second',
+    name: '[Verification] Alpha second',
     description: '',
     spaceId: '',
     newClient: 'test client beta',
@@ -101,7 +105,7 @@ try {
     type: 'project-capture',
     captureId: uuid(),
     captureText: 'create new project',
-    name: 'Test Alpha Third',
+    name: '[Verification] Alpha third',
     description: '',
     spaceId: beta.id,
     newClient: 'Another Name',
@@ -117,4 +121,17 @@ try {
   );
 } finally {
   await cleanup();
+  // Client deletion detaches projects instead of destroying work, so the
+  // suite hands the local database a broom, matching the capture suite.
+  for (const id of projectIds) assert.match(id, /^[a-f0-9-]+$/);
+  await mkdir('work', { recursive: true });
+  await writeFile(
+    'work/client-create-cleanup.sql',
+    projectIds
+      .flatMap((id) => [
+        `DELETE FROM projects WHERE org='local_seedy' AND id='${id}';`,
+        `DELETE FROM captureEntries WHERE org='local_seedy' AND id='${id}';`,
+      ])
+      .join('\n'),
+  );
 }

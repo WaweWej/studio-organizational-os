@@ -466,9 +466,7 @@ export default function ClientFocus({
           <h1>{space.name}</h1>
           <p>{space.tagline || space.brief}</p>
         </div>
-        <span className="cf-cover-label">
-          {data.demo ? 'Sample brand' : 'Your client workspace'}
-        </span>
+        {data.demo && <span className="cf-cover-label">Sample brand</span>}
       </section>
       <div className="cf-navigation">
         <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
@@ -812,7 +810,7 @@ export default function ClientFocus({
       {tab === 'meetings' && (
         <div className="cf-tab-body">
           <PanelHeading
-            title="Every conversation, kept together"
+            title="Meetings"
             action={
               <Button
                 className="cf-primary"
@@ -874,7 +872,7 @@ export default function ClientFocus({
       {tab === 'brand' && (
         <div className="cf-tab-body">
           <PanelHeading
-            title="The people and purpose behind the work"
+            title="Brand & context"
             action={
               <Button
                 variant="outline"
