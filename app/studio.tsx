@@ -923,7 +923,12 @@ export default function Studio() {
                   back={() => navigate('spaces')}
                 />
               ) : (
-                <ClientDirectory data={data} openSpace={space} />
+                <ClientDirectory
+                  data={data}
+                  openSpace={space}
+                  act={act}
+                  ready={ready}
+                />
               ))}
             {page === 'library' && <ResourceLibrary key="library" />}
             {page === 'tools' && <ResourceLibrary key="tools" mode="tools" />}

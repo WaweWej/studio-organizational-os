@@ -54,6 +54,76 @@ export async function mutateClient(c: Context, input: Record<string, unknown>) {
   const type = String(input.type);
   const id = textValue(input.id, 'Record', 100, true);
   const nonce = crypto.randomUUID();
+  // Explicit client creation, available from Spaces and the project form. The
+  // client supplies the ID so a retried request lands on the same record; the
+  // same name spelled again is an answer, not a duplicate.
+  if (type === 'client-create') {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        id,
+      )
+    )
+      throw new AppError('Invalid client ID.');
+    const name = textValue(input.name, 'Client name', 180, true);
+    const normalized = (value: string) =>
+      value.trim().replace(/\s+/g, ' ').toLowerCase();
+    const existing = await c.db
+      .prepare('SELECT id,name FROM spaces WHERE org=?')
+      .bind(c.org)
+      .all<{ id: string; name: string }>();
+    const match = (existing.results || []).find(
+      (s) => normalized(s.name) === normalized(name),
+    );
+    if (match && match.id !== id)
+      throw new AppError(
+        `“${match.name}” already exists. Open it in Spaces, or choose another name.`,
+        409,
+      );
+    const saved = await c.db.batch([
+      c.db
+        .prepare(
+          `INSERT INTO spaces (org,id,name,type,color,brief,owner,meeting,tagline,wants,needs,audience,voice,website,coverUrl,logoUrl,brandStyle,revision,lastMutation)
+           SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM spaces WHERE org=? AND id=?)`,
+        )
+        .bind(
+          c.org,
+          id,
+          name,
+          'Client',
+          '#6471bf',
+          '',
+          c.actor,
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          '',
+          'sans',
+          0,
+          nonce,
+          c.org,
+          id,
+        ),
+      event(c, id, null, `Client created by ${c.name}`, { name }, {
+        table: 'spaces',
+        id,
+        nonce,
+      }),
+    ]);
+    if (!saved[0].meta.changes) {
+      const already = await c.db
+        .prepare('SELECT name FROM spaces WHERE org=? AND id=?')
+        .bind(c.org, id)
+        .first<{ name: string }>();
+      if (!already || already.name !== name)
+        throw new AppError('This client was already saved differently.', 409);
+    }
+    return;
+  }
 
   if (type === 'client-project-deadline' || type === 'project-deadline') {
     const project = await c.db

@@ -251,3 +251,24 @@ this also makes the Google Calendar connection testable locally.
 tests/google-drive.mjs passes with the full regression sweep; TypeScript and
 the production build pass, and focused lint now sits below the repository's
 previous baseline.
+
+## Clients can be born anywhere · 11 September 2026
+
+An empty workspace previously had no way to create a client outside morning
+planning or a won prospect — the cold-start dead end. Spaces now has an
+explicit New client dialog: the record ID is generated once per dialog so a
+retried save lands on the same client, an existing name is answered with
+"open it instead" rather than a duplicate, and creation records a space event
+and opens the new space. The Desk's project form gains "+ New client…" in the
+client selector; the named client is created atomically in the same guarded
+batch as the project, with normalized-name reuse matching the planning flow,
+and the footer names the new client before commitment. Empty states now say
+what to do.
+
+tests/client-create.mjs verifies idempotent retries, name-collision honesty,
+atomic project-form creation, normalized reuse and both-choices rejection,
+cleaning up by exact IDs. Known debt, unchanged by this work: several API
+suites assume the legacy sample workspace records that fresh clones no longer
+seed, and tests/context-sales.mjs fails on its fixed September 2026 date
+against the current model on pristine code as well. TypeScript, focused lint
+and the production build pass.

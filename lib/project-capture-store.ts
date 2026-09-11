@@ -7,6 +7,7 @@ export async function mutateProjectCapture(
   input: Record<string, unknown>,
 ) {
   const id = textValue(input.captureId, 'Capture ID', 36, true);
+  let spaceId = textValue(input.spaceId ?? '', 'Client', 100) || null;
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       id,
@@ -16,8 +17,10 @@ export async function mutateProjectCapture(
   const name = textValue(input.name, 'Project name', 180, true),
     description = textValue(input.description ?? '', 'Project brief', 10000),
     due = dateValue(input.due ?? ''),
-    spaceId = textValue(input.spaceId ?? '', 'Client', 100) || null,
+    newClient = textValue(input.newClient ?? '', 'New client name', 180),
     sourceText = textValue(input.captureText, 'Entry', 2000, true);
+  if (newClient && spaceId)
+    throw new AppError('Choose an existing client or a new client.');
   if (!Array.isArray(input.resourceIds) || input.resourceIds.length > 30)
     throw new AppError('Choose up to 30 project files.');
   const resourceIds = [
@@ -32,6 +35,7 @@ export async function mutateProjectCapture(
     spaceId,
     sourceText,
     resourceIds,
+    ...(newClient ? { newClient } : {}),
   });
   const saved = await c.db
     .prepare('SELECT fingerprint FROM captureEntries WHERE org=? AND id=?')
@@ -48,6 +52,20 @@ export async function mutateProjectCapture(
   const data = await readWorkspace(c);
   if (spaceId && !data.spaces.some((s) => s.id === spaceId))
     throw new AppError('This client is no longer available.', 404);
+  const normalized = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  let createSpace: { id: string; name: string } | null = null;
+  if (newClient) {
+    const matches = data.spaces.filter(
+      (s) => normalized(s.name) === normalized(newClient),
+    );
+    if (matches.length > 1)
+      throw new AppError('Choose the exact client from the list.');
+    if (matches[0]) spaceId = matches[0].id;
+    else {
+      createSpace = { id: crypto.randomUUID(), name: newClient };
+      spaceId = createSpace.id;
+    }
+  }
   for (const id of resourceIds)
     if (
       !data.resources.some(
@@ -82,6 +100,39 @@ export async function mutateProjectCapture(
       nonce,
       fingerprint,
     ),
+    ...(createSpace
+      ? [
+          c.db
+            .prepare(
+              `INSERT INTO spaces (org,id,name,type,color,brief,owner,meeting,tagline,wants,needs,audience,voice,website,coverUrl,logoUrl,brandStyle,revision,lastMutation)
+               SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE ` + guard,
+            )
+            .bind(
+              c.org,
+              createSpace.id,
+              createSpace.name,
+              'Client',
+              '#6471bf',
+              '',
+              c.actor,
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              '',
+              'sans',
+              0,
+              nonce,
+              c.org,
+              id,
+              nonce,
+            ),
+        ]
+      : []),
     c.db
       .prepare(
         'INSERT INTO projects (org,id,name,spaceId,description,due) SELECT ?,?,?,?,?,? WHERE ' +

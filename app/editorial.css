@@ -1277,3 +1277,24 @@
 .spaces-heading h1 { margin:0; font:600 28px/1.2 var(--font-sans, sans-serif); letter-spacing:-.025em; }
 .spaces-heading > span { color:#687383; font-size:14px; }
 .spaces-empty { margin:28px 0; font-size:16px; color:#647083; }
+
+.spaces-heading .spaces-new-client {
+  margin-left: auto;
+}
+.new-client-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.new-client-dialog form > button[type='submit'] {
+  align-self: flex-end;
+}
+.new-client-existing {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted-foreground);
+}
+.new-client-existing button {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

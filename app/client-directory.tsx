@@ -3,18 +3,32 @@
 
 import { taskSpaceId } from '@/lib/task-context';
 import { useState, type CSSProperties } from 'react';
-import { ArrowUpRight, ArrowRight } from 'lucide-react';
+import { ArrowUpRight, ArrowRight, Plus } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { Workspace } from '@/lib/model';
 
 export default function ClientDirectory({
   data,
   openSpace,
+  act,
+  ready,
 }: {
   data: Workspace;
   openSpace: (id: string) => void;
+  act: (command: Record<string, unknown>) => Promise<boolean>;
+  ready: boolean;
 }) {
   const [filter, setFilter] = useState('all');
+  const [creating, setCreating] = useState(false);
   const ordered = [...data.spaces].sort((a, b) => a.name.localeCompare(b.name));
   const spaces = ordered.filter(
     (s) =>
@@ -26,7 +40,24 @@ export default function ClientDirectory({
       <header className="spaces-heading">
         <h1>Spaces</h1>
         <span>{data.spaces.length}</span>
+        <Button
+          variant="outline"
+          className="spaces-new-client"
+          disabled={!ready}
+          onClick={() => setCreating(true)}
+        >
+          <Plus size={15} />
+          New client
+        </Button>
       </header>
+      {creating && (
+        <NewClientDialog
+          data={data}
+          act={act}
+          openSpace={openSpace}
+          close={() => setCreating(false)}
+        />
+      )}
       <div className="cd-index-bar">
         <Tabs value={filter} onValueChange={(v) => setFilter(String(v))}>
           <TabsList variant="line" className="cd-filter">
@@ -41,8 +72,8 @@ export default function ClientDirectory({
           {filter === 'owned'
             ? 'No platforms yet.'
             : filter === 'clients'
-              ? 'No clients yet.'
-              : 'No spaces yet.'}
+              ? 'No clients yet. Create the first one, or win a prospect in Sales.'
+              : 'No spaces yet. Create your first client to give the work a home.'}
         </p>
       )}
       <div className="cd-grid">
@@ -116,5 +147,82 @@ export default function ClientDirectory({
         })}
       </div>
     </div>
+  );
+}
+
+
+// Explicit client creation. The record ID is generated once per dialog so a
+// retried save lands on the same client instead of creating a second one.
+function NewClientDialog({
+  data,
+  act,
+  openSpace,
+  close,
+}: {
+  data: Workspace;
+  act: (command: Record<string, unknown>) => Promise<boolean>;
+  openSpace: (id: string) => void;
+  close: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [id] = useState(() => crypto.randomUUID());
+  const [saving, setSaving] = useState(false);
+  const existing = data.spaces.find(
+    (s) =>
+      s.name.trim().replace(/\s+/g, ' ').toLowerCase() ===
+      name.trim().replace(/\s+/g, ' ').toLowerCase(),
+  );
+  const save = async () => {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    const success = await act({ type: 'client-create', id, name: name.trim() });
+    setSaving(false);
+    if (success) {
+      close();
+      openSpace(id);
+    }
+  };
+  return (
+    <Dialog open onOpenChange={(open) => !open && close()}>
+      <DialogContent className="new-client-dialog">
+        <DialogHeader>
+          <DialogTitle>New client</DialogTitle>
+          <DialogDescription>
+            A client space holds the work, files, meetings and history that
+            belong to them.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          <Input
+            value={name}
+            placeholder="Client name"
+            aria-label="Client name"
+            onChange={(e) => setName(e.target.value)}
+          />
+          {existing && name.trim() && (
+            <p className="new-client-existing">
+              “{existing.name}” already exists.{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  openSpace(existing.id);
+                }}
+              >
+                Open it instead
+              </button>
+            </p>
+          )}
+          <Button type="submit" disabled={!name.trim() || saving || !!existing}>
+            {saving ? 'Creating…' : 'Create client'}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -25,6 +25,7 @@ export type ProjectDraft = {
   name: string;
   description: string;
   spaceId: string;
+  newClient?: string;
   due: string;
   files: { id: string; file: File; uploaded: boolean }[];
 };
@@ -148,7 +149,8 @@ export default function ProjectCapture({
         captureText: sourceText,
         name: saved.name,
         description: saved.description,
-        spaceId: saved.spaceId,
+        spaceId: saved.spaceId === '__new' ? '' : saved.spaceId,
+        newClient: saved.spaceId === '__new' ? (saved.newClient || '').trim() : '',
         due: saved.due,
         resourceIds: saved.files.map((f) => f.id),
       });
@@ -223,8 +225,10 @@ export default function ProjectCapture({
                 aria-label="Project client"
               >
                 <SelectValue>
-                  {data.spaces.find((s) => s.id === draft.spaceId)?.name ||
-                    'Internal · no client'}
+                  {draft.spaceId === '__new'
+                    ? 'New client'
+                    : data.spaces.find((s) => s.id === draft.spaceId)?.name ||
+                      'Internal · no client'}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -234,8 +238,20 @@ export default function ProjectCapture({
                     {s.name}
                   </SelectItem>
                 ))}
+                <SelectItem value="__new">+ New client…</SelectItem>
               </SelectContent>
             </Select>
+            {draft.spaceId === '__new' && (
+              <Input
+                className="desk-project-new-client"
+                value={draft.newClient || ''}
+                placeholder="New client name"
+                aria-label="New client name"
+                onChange={(e) =>
+                  remember({ ...draft, newClient: e.target.value })
+                }
+              />
+            )}
           </div>
           <div>
             <label htmlFor={fieldId + '-due'}>Deadline</label>
@@ -334,14 +350,26 @@ export default function ProjectCapture({
             : draft.files.some((f) => f.uploaded)
               ? 'Uploaded files are in the library. Saving connects them to this project.'
               : 'Work' +
-                (draft.spaceId
-                  ? ' · ' +
-                    (data.spaces.find((s) => s.id === draft.spaceId)?.name ||
-                      'Client')
-                  : '') +
+                (draft.spaceId === '__new'
+                  ? draft.newClient?.trim()
+                    ? ' · ' + draft.newClient.trim() + ' (new client)'
+                    : ' · name the new client'
+                  : draft.spaceId
+                    ? ' · ' +
+                      (data.spaces.find((s) => s.id === draft.spaceId)?.name ||
+                        'Client')
+                    : '') +
                 (draft.due ? ' · ' + draft.due : '')}
         </span>
-        <Button type="submit" disabled={saving || busy || !ready}>
+        <Button
+          type="submit"
+          disabled={
+            saving ||
+            busy ||
+            !ready ||
+            (draft.spaceId === '__new' && !draft.newClient?.trim())
+          }
+        >
           {saving ? <LoaderCircle size={16} className="animate-spin" /> : null}
           Create project
         </Button>
