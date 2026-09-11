@@ -92,7 +92,19 @@ function insert(
     .bind(...values, ...(guard ? [org, guard.id, guard.nonce] : []));
 }
 export async function context(): Promise<Context> {
-  let user = await getChatGPTUser();
+  let user: {
+    userId: string;
+    displayName: string;
+    email: string;
+    fullName: string | null;
+  } | null = await getChatGPTUser();
+  if (!user) {
+    // Self-hosted deployments sit behind Cloudflare Access; identity comes
+    // from its verified JWT and only when the Access settings are configured.
+    const { headers } = await import('next/headers');
+    const { getAccessUser } = await import('./access-auth');
+    user = await getAccessUser({ headers: await headers() });
+  }
   if (!user && import.meta.env.DEV)
     user = {
       userId: 'local-studio-owner',

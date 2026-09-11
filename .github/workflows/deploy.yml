@@ -1,0 +1,48 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [codex/client-focus]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ vars.CLOUDFLARE_ACCOUNT_ID != '' }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Provision database and bucket if missing
+        run: |
+          npx wrangler d1 create studio-d1 2>/dev/null || true
+          npx wrangler r2 bucket create studio-r2 2>/dev/null || true
+
+      - name: Resolve database id
+        id: d1
+        run: |
+          ID=$(npx wrangler d1 list --json | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const db=JSON.parse(d).find(x=>x.name==='studio-d1');if(!db)process.exit(1);console.log(db.uuid)})")
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare production config
+        run: node scripts/prepare-deploy.mjs "${{ steps.d1.outputs.id }}"
+
+      - name: Apply migrations
+        run: npx wrangler d1 migrations apply studio-d1 --remote --config dist/server/wrangler.json
+
+      - name: Deploy
+        run: npx wrangler deploy --config dist/server/wrangler.json

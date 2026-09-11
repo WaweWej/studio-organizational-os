@@ -328,3 +328,22 @@ route now shares the single sameOrigin guard instead of an inline copy. The
 dev server additionally allows .devtunnels.ms hosts. Verified end to end
 through a live tunnel: page loads, mutations reach the command boundary, and
 unblessed origins keep getting 403.
+
+## Self-hosting on Cloudflare · 11 September 2026
+
+The build already emits a Workers-deployable artifact; a deploy workflow now
+carries it to the owner's own Cloudflare account on every push. The workflow
+provisions the studio-d1 database and studio-r2 bucket when missing, applies
+migrations remotely, rewrites the built config for production through
+scripts/prepare-deploy.mjs (no variables baked into the artifact), and
+deploys — skipping silently until the account is configured, so the
+repository stays green beforehand. Identity for self-hosted deployments comes
+from Cloudflare Access: lib/access-auth.ts verifies the Access JWT against
+the team's published signing keys — signature, audience, issuer, and expiry —
+and only when both Access settings are configured; an unconfigured or
+unauthenticated deployment keeps failing closed with the existing sign-in
+error. Each verified email receives its own workspace, matching the hosted
+model. docs/DEPLOY.md is the complete ten-minute runbook, including the
+Google and Slack settings that make those connections real on the new
+address. tests/access-auth.mjs proves the verification against a generated
+keypair, including tampered signatures and unknown keys.
