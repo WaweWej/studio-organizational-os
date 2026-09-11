@@ -1,9 +1,18 @@
 import { changeDayWork } from './day-work-store';
 import { googleStatus } from './google-calendar-sync';
+import { driveStatus } from './google-drive';
 import type { GoogleConfig } from './google-calendar-auth';
 import { mutateClientLifecycle } from './client-lifecycle-store';
 import { mutateProjectCapture } from './project-capture-store';
 import { blockerRecipients, type CaptureEntry } from './entry-model';
+import {
+  slackMessageRow,
+  deliverSlackMessages,
+  slackEventTransport,
+  slackInboundConfig,
+  type SlackEnv,
+  type SlackEventKind,
+} from './slack';
 import { mutateEntry, captureInsert } from './entry-store';
 import { mutateSales } from './sales-store';
 import { mutateResource, upgradeResources } from './resource-store';
@@ -61,7 +70,7 @@ export type Context = {
 type DataRow = Record<string, string | number | null>;
 function insert(
   db: D1Database,
-  table: Table,
+  table: Table | 'slackMessages',
   org: string,
   row: object,
   guard?: { id: string; nonce: string },
@@ -180,7 +189,23 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
   );
   const allTasks = out.tasks as Task[];
   out.googleCalendar = await googleStatus(c, env as unknown as GoogleConfig);
+  out.googleDrive = await driveStatus(c, env as unknown as GoogleConfig);
   out.slackConnected = !!slackUrl(env as unknown as SlackConfig, c.org);
+  const slackDeliveryCounts = await c.db
+    .prepare(
+      "SELECT deliveryStatus AS s, COUNT(*) AS n FROM slackMessages WHERE org=? AND deliveryStatus IN ('pending','failed','unknown','sending') GROUP BY deliveryStatus",
+    )
+    .bind(c.org)
+    .all<{ s: string; n: number }>();
+  out.slackCoverage = {
+    plan: out.slackConnected,
+    events: !!slackEventTransport(env as unknown as SlackEnv, c.org),
+    inbound: !!slackInboundConfig(env as unknown as SlackEnv),
+    undelivered: (slackDeliveryCounts.results || []).reduce(
+      (sum, row) => sum + Number(row.n),
+      0,
+    ),
+  };
   out.calendarEvents = (
     out.calendarEvents as NonNullable<Workspace['calendarEvents']>
   ).filter((e) => (!e.archived || e.googleEventId) && (!e.googleEventId || e.actor === c.actor));
@@ -584,6 +609,21 @@ export async function mutate(
         guard,
       ),
     );
+  let slackQueued = false;
+  // Workspace events queue for Slack atomically with their mutation. The row is
+  // 'pending' only when a transport is configured; delivery happens after commit.
+  const slackEvent = (kind: SlackEventKind, body: string) => {
+    slackQueued = true;
+    secondary.push(
+      insert(
+        c.db,
+        'slackMessages',
+        c.org,
+        slackMessageRow(env as unknown as SlackEnv, c.org, kind, id, body, now),
+        guard,
+      ),
+    );
+  };
   const submit = async () => {
     const reviewer = textValue(input.reviewer ?? task.reviewer, 'Reviewer', 100, true);
     canSubmit({ ...task, reviewer });
@@ -614,6 +654,7 @@ export async function mutate(
       ),
     );
     notify(reviewer, `Ready for review: ${task.title}`);
+    slackEvent('review-request', c.name + ' submitted for review: ' + task.title);
   };
   const complete = () => {
     if (task.stage === 'Done')
@@ -653,6 +694,12 @@ export async function mutate(
             task.title +
             (input.clear === true ? '' : ' — ' + body),
         );
+      slackEvent(
+        'blocker',
+        (input.clear === true ? 'Unblocked: ' : 'Needs help: ') +
+          task.title +
+          (input.clear === true ? '' : ' — ' + body),
+      );
     } else activity = 'Progress: ' + body;
     secondary.push(
       insert(
@@ -754,6 +801,7 @@ export async function mutate(
     updates.stage = decision === 'Approved' ? 'Review' : 'Doing';
     activity = `${decision} for version ${task.version}`;
     notify(task.assignee, `${decision}: ${task.title}`);
+    slackEvent('review-decision', `${decision}: ${task.title}`);
   } else if (type === 'complete') complete();
   else throw new AppError('Unknown action.');
   if (capture) {
@@ -807,4 +855,11 @@ export async function mutate(
       'This task changed in another session. Close and reopen it to refresh.',
       409,
     );
+  if (slackQueued) {
+    try {
+      await deliverSlackMessages(c, env as unknown as SlackEnv);
+    } catch {
+      /* The mutation is committed even if delivery bookkeeping is unavailable. */
+    }
+  }
 }

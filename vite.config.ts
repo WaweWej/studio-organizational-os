@@ -2,6 +2,7 @@ import { sites } from '@openai/sites-vite-plugin';
 import tailwindcss from '@tailwindcss/postcss';
 import vinext from 'vinext';
 import { defineConfig } from 'vite';
+import { readFileSync } from 'node:fs';
 import hostingConfig from './.openai/hosting.json';
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -9,12 +10,31 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 
+// Local runtime settings. The inline binding config below bypasses Wrangler's
+// own `.dev.vars` discovery, so load it here: KEY=VALUE lines, `#` comments.
+// The file is gitignored; production values live in the hosting settings.
+function localVars() {
+  try {
+    const lines = readFileSync('.dev.vars', 'utf8').split('\n');
+    const vars: Record<string, string> = {};
+    for (const line of lines) {
+      const match = /^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+      if (match && !line.trimStart().startsWith('#'))
+        vars[match[1]] = match[2].replace(/^"(.*)"$/, '$1');
+    }
+    return vars;
+  } catch {
+    return {};
+  }
+}
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 
 const localBindingConfig = {
   main: 'vinext/server/fetch-handler',
   compatibility_flags: ['nodejs_compat'],
+  vars: localVars(),
   d1_databases: d1
     ? [
         {
@@ -49,9 +69,13 @@ export default defineConfig(async () => {
     // Keep optimized packages under node_modules for Vinext's CJS transform.
     cacheDir: process.env.STUDIO_TEST_STATE ? 'node_modules/.vite-studio-tests' : 'node_modules/.vite',
     css: { postcss: { plugins: [tailwindcss()] } },
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    // The API suites and documentation address the preview at localhost:5173.
+    server: {
+      port: Number(process.env.STUDIO_DEV_PORT) || 5173,
+      ...(isCodexSeatbeltSandbox
+        ? { watch: { useFsEvents: false, usePolling: true } }
+        : {}),
+    },
     plugins: [
       vinext(),
       sites(),

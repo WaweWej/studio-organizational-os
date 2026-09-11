@@ -209,3 +209,45 @@ Prepared this standalone Studio repository for private GitHub synchronization. R
 Verification used an isolated copy of the tracked source and new documentation, with no copied dependencies or workspace data. A clean npm ci installed 582 packages; all seven local migrations applied; the production build passed with the existing client chunk warning. Its Desk and workspace API returned 200 and the expected 12 sample tasks / 5 sample projects. The temporary server was stopped. TypeScript, intent tests and documentation links also passed. The original workspace database and running preview were not changed.
 
 Git shares source and durable documentation only. Each independent clone has its own local sample data; it does not synchronize the original preview's user records, files, vault, browser drafts or Codex transcript. Codex Remote is documented for continuing the same conversation and host state. The CLI's remote-control start command reports that its daemon lifecycle is Unix-only, so Windows device pairing must be completed through the desktop app. This development setup does not deploy the Studio application or change its Sites access.
+
+## Slack in both directions · 10 September 2026
+
+Blockers, review requests and review decisions now queue Slack messages
+atomically with their mutations, delivered through a bot token or the existing
+webhook with the daily-plan truthfulness rules: sent only on confirmation,
+failed on rejection, unknown and never blindly resent on a lost response. A
+new `/api/slack` endpoint accepts signed slash commands and bot DMs,
+deduplicates Slack's retries, maps Slack users to members through
+configuration, and runs inbound text through the same interpreter and command
+boundary as the Desk — notes, meetings, deadlines, progress, blockers, status,
+tasks with client references and full sales sentences. Systems shows granular
+Slack coverage and undelivered counts. Configuration is six runtime settings
+documented in docs/SLACK.md; nothing is implied when they are absent.
+
+Migration 0017 adds the outbox and inbound-dedup tables. The dev server is
+pinned to port 5173, which the API suites and documentation already assumed.
+tests/slack.mjs passes alongside the entry, capture, desk, task lifecycle,
+review, sales and daily-plan suites; TypeScript, focused lint and the
+production build pass.
+
+## Google Drive uploads and browsing · 10 September 2026
+
+Drive extends the Calendar Google connection with separately recorded scopes.
+With Drive connected, dropped and uploaded assets and templates land in a
+Studio/<Client> folder tree in Drive resolved from the file's targets, with
+the canonical resource record kept in Studio and links opening in Drive; tools
+stay in Studio storage, and unconnected workspaces behave exactly as before.
+Folder bookkeeping searches before creating so retries and renames never
+duplicate folders, and upload retries reuse the canonical record instead of
+uploading again. A Library strip shows the truthful connection state, offers
+the connect flow, and — with browsing granted — an attach-from-Drive search
+that links existing files without duplicating records. Systems reports uploads
+only versus uploads and browsing.
+
+Migration 0018 adds granted scopes, Drive file identity on resources and the
+folder cache. Local previews now read runtime settings from a gitignored
+.dev.vars file, which the inline binding configuration previously ignored —
+this also makes the Google Calendar connection testable locally.
+tests/google-drive.mjs passes with the full regression sweep; TypeScript and
+the production build pass, and focused lint now sits below the repository's
+previous baseline.

@@ -68,8 +68,31 @@ export default function ConnectionCoverage({
                     ? 'Needs attention'
                     : 'Connected'
                   : 'Connect in Calendar'
-                : name === 'Slack' && data.slackConnected
-                  ? 'Connected'
+                : name === 'Google Drive'
+                  ? data.googleDrive?.connected
+                    ? data.googleDrive.access === 'full'
+                      ? 'Connected · uploads and browsing'
+                      : 'Connected · uploads only'
+                    : data.googleDrive?.configured
+                      ? 'Connect in Library'
+                      : 'Not connected'
+                  : name === 'Slack'
+                  ? [
+                      data.slackCoverage?.plan && 'plan delivery',
+                      data.slackCoverage?.events && 'workspace events',
+                      data.slackCoverage?.inbound && 'inbound capture',
+                    ].filter(Boolean).length
+                    ? [
+                        data.slackCoverage?.plan && 'plan delivery',
+                        data.slackCoverage?.events && 'workspace events',
+                        data.slackCoverage?.inbound && 'inbound capture',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') +
+                      (data.slackCoverage?.undelivered
+                        ? ` · ${data.slackCoverage.undelivered} undelivered`
+                        : '')
+                    : 'Not connected'
                   : 'Not connected'}
             </span>
           </div>

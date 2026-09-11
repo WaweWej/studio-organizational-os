@@ -76,7 +76,7 @@ export async function POST(request: Request) {
           503,
         );
       const secret = randomSecret(),
-        url = await startGoogle(c, cfg, secret);
+        url = await startGoogle(c, cfg, secret, input.drive === true);
       const response = json({ url });
       response.headers.set(
         'Set-Cookie',

@@ -41,4 +41,5 @@ export type GoogleConnection = {
   lease: string;
   leaseUntil: number;
   createAttempt: number;
+  scopes: string;
 };

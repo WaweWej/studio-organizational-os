@@ -5,7 +5,7 @@ export type Resource = {
   id: string;
   title: string;
   kind: ResourceKind;
-  source: 'link' | 'file' | 'html' | 'text' | 'vault';
+  source: 'link' | 'file' | 'html' | 'text' | 'vault' | 'drive';
   description: string;
   url: string;
   content: string;

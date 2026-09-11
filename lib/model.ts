@@ -131,6 +131,18 @@ export type Workspace = {
   environment?: 'local' | 'hosted';
   dailyPlans?: DailyPlan[];
   slackConnected?: boolean;
+  googleDrive?: {
+    configured: boolean;
+    connected: boolean;
+    access: 'full' | 'upload' | null;
+    account?: string;
+  };
+  slackCoverage?: {
+    plan: boolean;
+    events: boolean;
+    inbound: boolean;
+    undelivered: number;
+  };
   calendarEvents?: CalendarEvent[];
   archivedTasks?: Task[];
   captureEntries: CaptureEntry[];

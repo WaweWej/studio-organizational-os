@@ -30,6 +30,8 @@ import {
   List,
   Workflow,
   X,
+  HardDriveUpload,
+  CloudCheck,
 } from 'lucide-react';
 import { CommandGroup, CommandItem } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
@@ -279,11 +281,13 @@ function ResourceCard({
                     ? 'CUSTOM HTML'
                     : r.kind === 'vault'
                       ? 'ENCRYPTED'
-                      : r.source === 'link'
-                        ? r.url
-                          ? 'CONNECTED LINK'
-                          : 'LINK NEEDED'
-                        : 'STUDIO LIBRARY'}
+                      : r.source === 'drive'
+                        ? 'GOOGLE DRIVE'
+                        : r.source === 'link'
+                          ? r.url
+                            ? 'CONNECTED LINK'
+                            : 'LINK NEEDED'
+                          : 'STUDIO LIBRARY'}
               </span>
             )}
           </>
@@ -676,6 +680,9 @@ export default function ResourceLibrary({
           </Button>
         </div>
       </header>
+      {kind !== 'vault' && kind !== 'tool' && (
+        <DriveStrip space={space} refresh={refresh} />
+      )}
       {
         <Tabs
           value={tab}
@@ -995,7 +1002,12 @@ function ResourceForm({
               target="_blank"
               rel="noreferrer"
             >
-              Open {kind === 'template' ? 'original' : 'link'}
+              Open{' '}
+              {r.source === 'drive'
+                ? 'in Drive'
+                : kind === 'template'
+                  ? 'original'
+                  : 'link'}
               <ArrowUpRight size={15} />
             </a>
           ) : null}
@@ -1448,5 +1460,213 @@ export function ResourceCommands({ done }: { done: () => void }) {
           </CommandItem>
         ))}
     </CommandGroup>
+  );
+}
+
+// Google Drive connection strip. Shows the truthful state of the Drive link,
+// offers connection through the same Google account flow Calendar uses, and
+// opens the attach-from-Drive search when browsing access is granted.
+function DriveStrip({
+  space,
+  refresh,
+}: {
+  space: string;
+  refresh: () => Promise<unknown>;
+}) {
+  const { data, ready } = useLibrary();
+  const drive = data.googleDrive;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [attachOpen, setAttachOpen] = useState(false);
+  if (!drive?.configured) return null;
+  const connect = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const response = await fetch('/api/google-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'connect', drive: true }),
+      });
+      const body = (await response.json()) as { url?: string; error?: string };
+      if (!response.ok || !body.url)
+        throw new Error(body.error || 'Google Drive could not connect.');
+      window.location.assign(body.url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Google Drive could not connect.');
+      setBusy(false);
+    }
+  };
+  return (
+    <output className="drive-strip">
+      {drive.connected ? (
+        <>
+          <CloudCheck size={16} />
+          <span>
+            Uploads land in your Google Drive under <strong>Studio</strong>
+            {drive.account ? ` (${drive.account})` : ''}.
+          </span>
+          {drive.access === 'full' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!ready}
+              onClick={() => setAttachOpen(true)}
+            >
+              <HardDriveUpload size={14} />
+              Attach from Drive
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" disabled={busy} onClick={connect}>
+              Enable Drive browsing
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
+          <HardDriveUpload size={16} />
+          <span>
+            Connect Google Drive to store uploads there and attach existing
+            files.
+          </span>
+          <Button variant="outline" size="sm" disabled={busy} onClick={connect}>
+            {busy ? 'Opening Google…' : 'Connect Google Drive'}
+          </Button>
+        </>
+      )}
+      {error && (
+        <p className="resource-error" role="alert">
+          {error}
+        </p>
+      )}
+      {attachOpen && (
+        <DriveAttach
+          space={space}
+          close={() => setAttachOpen(false)}
+          refresh={refresh}
+        />
+      )}
+    </output>
+  );
+}
+
+// Search Google Drive and attach a file as a canonical library resource. The
+// file stays in Drive; Studio records what it is and what it belongs to.
+function DriveAttach({
+  space,
+  close,
+  refresh,
+}: {
+  space: string;
+  close: () => void;
+  refresh: () => Promise<unknown>;
+}) {
+  const [query, setQuery] = useState('');
+  const [files, setFiles] = useState<
+    { id: string; name: string; mimeType: string; modifiedTime: string }[]
+  >([]);
+  const [state, setState] = useState<'idle' | 'searching' | 'attaching'>('idle');
+  const [message, setMessage] = useState('');
+  const search = async (value: string) => {
+    setState('searching');
+    setMessage('');
+    try {
+      const response = await fetch(
+        '/api/google-drive?q=' + encodeURIComponent(value),
+      );
+      const body = (await response.json()) as {
+        files?: { id: string; name: string; mimeType: string; modifiedTime: string }[];
+        error?: string;
+      };
+      if (!response.ok) throw new Error(body.error);
+      setFiles(body.files || []);
+      setMessage(body.files?.length ? '' : 'No matching Drive files.');
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Drive search failed.');
+    } finally {
+      setState('idle');
+    }
+  };
+  const initial = useRef(false);
+  useEffect(() => {
+    if (initial.current) return;
+    initial.current = true;
+    void search('');
+  });
+  const attachFile = async (fileId: string, name: string) => {
+    setState('attaching');
+    setMessage('');
+    try {
+      const response = await fetch('/api/google-drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'attach',
+          attachId: crypto.randomUUID(),
+          fileId,
+          targets:
+            space !== 'all' ? [{ type: 'space', id: space }] : [],
+        }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(body.error);
+      await refresh();
+      setMessage(`Attached ${name}.`);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'The file could not be attached.');
+    } finally {
+      setState('idle');
+    }
+  };
+  return (
+    <Dialog open onOpenChange={(open) => !open && close()}>
+      <DialogContent className="drive-attach">
+        <DialogHeader>
+          <DialogTitle>Attach from Google Drive</DialogTitle>
+          <DialogDescription>
+            The file stays in Drive. Studio links it{' '}
+            {space !== 'all' ? 'to this client' : 'in the shared library'}.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void search(query);
+          }}
+        >
+          <Input
+            value={query}
+            placeholder="Search your Drive"
+            aria-label="Search Google Drive"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </form>
+        <div className="drive-attach-results">
+          {files.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              disabled={state !== 'idle'}
+              onClick={() => void attachFile(f.id, f.name)}
+            >
+              <span>{f.name}</span>
+              <small>
+                {f.mimeType.split('.').pop()?.split('/').pop()}
+                {f.modifiedTime ? ` · ${f.modifiedTime.slice(0, 10)}` : ''}
+              </small>
+            </button>
+          ))}
+        </div>
+        {(message || state !== 'idle') && (
+          <output>
+            {state === 'searching'
+              ? 'Searching Drive…'
+              : state === 'attaching'
+                ? 'Attaching…'
+                : message}
+          </output>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

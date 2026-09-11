@@ -120,6 +120,20 @@
       "when": 1789047190014,
       "tag": "0016_huge_tattoo",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1789058276569,
+      "tag": "0017_living_tombstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1789059073228,
+      "tag": "0018_soft_roulette",
+      "breakpoints": true
     }
   ]
 }

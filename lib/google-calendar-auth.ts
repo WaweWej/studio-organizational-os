@@ -13,6 +13,13 @@ export const googleScopes = [
   'calendar.events.readonly',
   'calendar.app.created',
 ].map((s) => 'https://www.googleapis.com/auth/' + s);
+// Drive access is a separately approved extension of the same account link.
+// drive.file covers the Studio folder tree and uploads; drive.readonly covers
+// browsing and attaching existing files.
+export const driveScopes = [
+  'drive.file',
+  'drive.readonly',
+].map((s) => 'https://www.googleapis.com/auth/' + s);
 const encoder = new TextEncoder();
 const base64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 const unbase64 = (value: string) =>
@@ -193,6 +200,7 @@ export async function startGoogle(
   c: Context,
   config: GoogleConfig,
   browserSecret: string,
+  withDrive = false,
 ) {
   requireGoogleConfig(config);
   const state = randomSecret(),
@@ -227,8 +235,11 @@ export async function startGoogle(
       client_id: config.GOOGLE_CLIENT_ID!,
       redirect_uri: config.GOOGLE_REDIRECT_URI!,
       response_type: 'code',
-      scope: googleScopes.join(' '),
+      scope: (withDrive ? [...googleScopes, ...driveScopes] : googleScopes).join(
+        ' ',
+      ),
       access_type: 'offline',
+      include_granted_scopes: 'true',
       prompt: 'consent select_account',
       state,
       code_challenge: challenge,
@@ -298,9 +309,14 @@ export async function finishGoogle(
     );
   if (previous && previous.leaseUntil > Date.now())
     throw new AppError('A sync is running. Wait before reconnecting.', 409);
+  const grantedScopes = (tokens.scope || '')
+    .split(' ')
+    .filter((s) => s.startsWith('https://www.googleapis.com/auth/'))
+    .sort()
+    .join(' ');
   const saved = await c.db
-    .prepare(`INSERT INTO googleConnections (org,actor,token,account,selected,timeZone) VALUES (?,?,?,?,?,?)
-    ON CONFLICT(org,actor) DO UPDATE SET token=excluded.token,status='connected',error='' WHERE googleConnections.leaseUntil<?`)
+    .prepare(`INSERT INTO googleConnections (org,actor,token,account,selected,timeZone,scopes) VALUES (?,?,?,?,?,?,?)
+    ON CONFLICT(org,actor) DO UPDATE SET token=excluded.token,status='connected',error='',scopes=excluded.scopes WHERE googleConnections.leaseUntil<?`)
     .bind(
       c.org,
       c.actor,
@@ -308,6 +324,7 @@ export async function finishGoogle(
       primary.id,
       JSON.stringify([primary.id]),
       primary.timeZone || 'UTC',
+      grantedScopes,
       Date.now(),
     )
     .run();

@@ -168,8 +168,23 @@ export const googleConnections = sqliteTable(
     lease: text('lease').notNull().default(''),
     leaseUntil: integer('leaseUntil').notNull().default(0),
     createAttempt: integer('createAttempt').notNull().default(0),
+    scopes: text('scopes').notNull().default(''),
   },
   (t) => [primaryKey({ columns: [t.org, t.actor] })],
+);
+export const driveFolders = sqliteTable(
+  'driveFolders',
+  {
+    ...identity(),
+    spaceId: text('spaceId').notNull().default(''),
+    folderId: text('folderId').notNull(),
+    name: text('name').notNull(),
+    createdAt: text('createdAt').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    uniqueIndex('drive_folders_by_space').on(t.org, t.spaceId),
+  ],
 );
 export const googleOAuthStates = sqliteTable(
   'googleOAuthStates',
@@ -380,6 +395,7 @@ export const resources = sqliteTable(
     mime: text('mime').notNull().default(''),
     size: integer('size').notNull().default(0),
     fileKey: text('fileKey').notNull().default(''),
+    driveFileId: text('driveFileId').notNull().default(''),
     shared: integer('shared').notNull().default(0),
     archived: integer('archived').notNull().default(0),
     revision: integer('revision').notNull().default(0),
@@ -503,6 +519,34 @@ export const captureEntries = sqliteTable(
   ],
 );
 
+export const slackMessages = sqliteTable(
+  'slackMessages',
+  {
+    ...identity(),
+    kind: text('kind').notNull(),
+    refId: text('refId').notNull(),
+    body: text('body').notNull(),
+    createdAt: text('createdAt').notNull(),
+    deliveryStatus: text('deliveryStatus').notNull().default('not_connected'),
+    deliveryError: text('deliveryError').notNull().default(''),
+    deliveryClaim: text('deliveryClaim').notNull().default(''),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    index('slack_messages_by_status').on(t.org, t.deliveryStatus, t.createdAt),
+  ],
+);
+export const slackInbound = sqliteTable(
+  'slackInbound',
+  {
+    ...identity(),
+    createdAt: text('createdAt').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    index('slack_inbound_by_time').on(t.org, t.createdAt),
+  ],
+);
 export const clientRemovals = sqliteTable(
   'clientRemovals',
   {
