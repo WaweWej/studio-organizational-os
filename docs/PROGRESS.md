@@ -315,3 +315,16 @@ creates, records carry the [Verification] prefix, and the local workspace was
 swept clean. Detached projects presenting as Internal after a client is
 removed is recorded here as a product question for later: they may deserve a
 "formerly of" label or an archive.
+
+## Blessed preview origins · 11 September 2026
+
+Mutations are guarded by a same-origin check, which correctly refused requests
+arriving through a dev tunnel: the proxy rewrites the Host and Origin headers,
+so the browser's origin never matches the server's own. A new optional
+STUDIO_PREVIEW_ORIGIN runtime setting holds a comma-separated list of
+explicitly blessed origins that may mutate; nothing is inferred from
+forwardable headers, foreign origins are still refused, and the workspace
+route now shares the single sameOrigin guard instead of an inline copy. The
+dev server additionally allows .devtunnels.ms hosts. Verified end to end
+through a live tunnel: page loads, mutations reach the command boundary, and
+unblessed origins keep getting 403.

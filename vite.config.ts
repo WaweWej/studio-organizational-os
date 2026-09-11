@@ -72,6 +72,10 @@ export default defineConfig(async () => {
     // The API suites and documentation address the preview at localhost:5173.
     server: {
       port: Number(process.env.STUDIO_DEV_PORT) || 5173,
+      // Local previews are sometimes reached through a dev tunnel; the app's
+      // own origin guard (STUDIO_PREVIEW_ORIGIN) still decides which browser
+      // origin may mutate.
+      allowedHosts: ['.devtunnels.ms'],
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),
