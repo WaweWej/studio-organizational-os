@@ -347,3 +347,19 @@ model. docs/DEPLOY.md is the complete ten-minute runbook, including the
 Google and Slack settings that make those connections real on the new
 address. tests/access-auth.mjs proves the verification against a generated
 keypair, including tampered signatures and unknown keys.
+
+## Card-free storage · 11 September 2026
+
+The R2 bucket is now optional, because enabling R2 requires a payment card
+even at free-tier usage. A storage layer presents the same four operations
+over two backends: the bucket when bound, and — card-free deployments — the
+database for small files (1 MB, with a truthful refusal pointing at Google
+Drive for anything larger). Real documents belong in Drive either way; tools
+and other Studio-kept files are kilobytes. The deploy workflow detects
+whether the account has R2 (error 10042 on bucket creation) and configures
+the artifact accordingly, so the same repository deploys onto either kind of
+account with no flags to remember. Migration 0020 adds the byte shelf;
+tests/file-store.mjs covers round-trips, the cap, and tenant isolation.
+Known debt: tests/resources.mjs expects a legacy starter fixture and fails on
+pristine code in fresh clones, same class as the other fixture-dependent
+suites.

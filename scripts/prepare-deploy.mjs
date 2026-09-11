@@ -8,8 +8,11 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const databaseId = process.argv[2];
+const withR2 = process.argv[3] === 'with-r2';
 if (!databaseId || !/^[0-9a-f-]{36}$/.test(databaseId)) {
-  console.error('Usage: node scripts/prepare-deploy.mjs <d1 database id>');
+  console.error(
+    'Usage: node scripts/prepare-deploy.mjs <d1 database id> [with-r2|no-r2]',
+  );
   process.exit(1);
 }
 const path = 'dist/server/wrangler.json';
@@ -26,8 +29,16 @@ config.d1_databases = [
     migrations_dir: '../../drizzle',
   },
 ];
-config.r2_buckets = [{ binding: 'ASSETS', bucket_name: 'studio-r2' }];
+// Card-free accounts run without R2: small Studio files live in the
+// database and documents belong in Google Drive.
+config.r2_buckets = withR2
+  ? [{ binding: 'ASSETS', bucket_name: 'studio-r2' }]
+  : [];
 config.workers_dev = true;
 
 writeFileSync(path, JSON.stringify(config, null, 2));
-console.log('prepared: studio worker, d1 ' + databaseId + ', r2 studio-r2');
+console.log(
+  'prepared: studio worker, d1 ' +
+    databaseId +
+    (withR2 ? ', r2 studio-r2' : ', database file storage (no R2)'),
+);

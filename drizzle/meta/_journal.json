@@ -141,6 +141,13 @@
       "when": 1789115282336,
       "tag": "0019_known_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1789130896652,
+      "tag": "0020_high_frog_thor",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  blob,
 } from 'drizzle-orm/sqlite-core';
 const identity = () => ({
   org: text('org').notNull(),
@@ -563,4 +564,18 @@ export const clientRemovals = sqliteTable(
     mutation: text('mutation').notNull(),
   },
   (t) => [primaryKey({ columns: [t.org, t.id] })],
+);
+
+// Byte storage for Studio-kept files when no R2 bucket is bound (card-free
+// deployments). Small files only; documents belong in Google Drive.
+export const fileBlobs = sqliteTable(
+  'fileBlobs',
+  {
+    org: text('org').notNull(),
+    key: text('key').notNull(),
+    fingerprint: text('fingerprint').notNull().default(''),
+    bytes: blob('bytes').notNull(),
+    createdAt: text('createdAt').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.org, t.key] })],
 );

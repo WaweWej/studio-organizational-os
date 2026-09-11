@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { context, readWorkspace } from '@/lib/store';
+import { studioStore } from '@/lib/file-store';
 import { json, apiFailure, sameOrigin, boundedBody } from '@/lib/api-safety';
 import {
   MAX_FILE_SIZE,
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const c = await context();
-    if (!env.ASSETS) throw new AppError('File storage is unavailable.', 503);
+    const store = studioStore(c);
     const bytes = await boundedBody(request, MAX_FILE_SIZE + 65536),
       form = await new Response(bytes, {
         headers: { 'Content-Type': request.headers.get('content-type') || '' },
@@ -208,7 +209,7 @@ export async function POST(request: Request) {
       return json(await readWorkspace(c));
     }
     const checkRetry = async (existing: { fileKey: string }) => {
-      const object = await env.ASSETS.head(existing.fileKey);
+      const object = await store.head(existing.fileKey);
       if (object?.customMetadata?.captureFingerprint !== fingerprint)
         throw new AppError(
           'This upload was already saved with different details.',
@@ -220,7 +221,7 @@ export async function POST(request: Request) {
       await checkRetry(existing);
       return json(await readWorkspace(c));
     }
-    await env.ASSETS.put(fileKey, content, {
+    await store.put(fileKey, content, {
       customMetadata: { captureFingerprint: fingerprint },
     });
     try {
@@ -262,7 +263,7 @@ export async function POST(request: Request) {
         ),
       ]);
       if (!result[0].meta.changes) {
-        await env.ASSETS.delete(fileKey);
+        await store.delete(fileKey);
         const winner = await find();
         if (!winner)
           throw new AppError('The file could not be saved. Try again.', 409);
@@ -271,7 +272,7 @@ export async function POST(request: Request) {
     } catch (error) {
       // Do not remove a committed object's bytes after an uncertain database response.
       const committed = await find();
-      if (committed?.fileKey !== fileKey) await env.ASSETS.delete(fileKey);
+      if (committed?.fileKey !== fileKey) await store.delete(fileKey);
       else {
         await checkRetry(committed);
         return json(await readWorkspace(c));
@@ -300,7 +301,7 @@ export async function GET(request: Request) {
         source: string;
       }>();
     if (!r?.fileKey) throw new AppError('File not found.', 404);
-    const object = await env.ASSETS.get(r.fileKey);
+    const object = await studioStore(c).get(r.fileKey);
     if (!object) throw new AppError('File not found.', 404);
     const run = url.searchParams.get('run') === '1' && r.source === 'html',
       preview =
