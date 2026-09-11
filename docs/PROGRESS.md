@@ -272,3 +272,27 @@ suites assume the legacy sample workspace records that fresh clones no longer
 seed, and tests/context-sales.mjs fails on its fixed September 2026 date
 against the current model on pristine code as well. TypeScript, focused lint
 and the production build pass.
+
+## Rhythms: recurring tasks and client meetings · 11 September 2026
+
+Tasks and meetings can carry a rhythm — weekly, every two weeks, monthly or
+quarterly — with no background scheduler. A recurring task spawns its next
+occurrence in the same transaction that completes it, advancing from the later
+of the due date and the completion day, so late work recurs upcoming rather
+than already overdue; a repeated completion is a no-op and the chain keeps its
+lineage under one root. A recurring meeting materializes its next occurrence
+on workspace reads once its time has passed — the same while-the-app-is-open
+pattern calendar sync uses — landing on a single future occurrence however
+long the rhythm was neglected, recording a space event on the client timeline,
+and continuing past a cancelled occurrence; removing the rhythm is what stops
+it. Unattended items stay a single overdue record; nothing multiplies on its
+own. The task sheet gains a Repeats control and rhythm chip; the client
+space's Plan a conversation gains the same choice. Materialized meetings flow
+to Google Calendar through the existing export.
+
+Migration 0019 adds rhythm and lineage columns. tests/recurrence.mjs covers
+the deterministic date math (clamping, leap years, catch-up); tests/
+recurring.mjs exercises the real command boundary in isolated SQLite for
+spawn-once semantics, chain lineage, editable validation, meeting
+materialization idempotence and tenant isolation. The full regression sweep,
+TypeScript, focused lint and the production build pass.

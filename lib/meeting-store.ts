@@ -1,4 +1,5 @@
 import type { Context } from './store';
+import { validRecurrence, nextMeetingStart } from './recurrence';
 import type { Meeting, CalendarEvent, Task } from './model';
 import { AppError, revisionValue, textValue } from './validation';
 
@@ -207,6 +208,12 @@ export async function mutateMeeting(
       notes: textValue(input.notes ?? '', 'Meeting notes', 30000),
       decisions: textValue(input.decisions ?? '', 'Decisions', 15000),
       participants: textValue(input.participants ?? '', 'Participants', 3000),
+      recurrence: (() => {
+        const value = input.recurrence ?? '';
+        if (!validRecurrence(value))
+          throw new AppError('Choose a supported meeting rhythm.');
+        return value;
+      })(),
     };
     const calendarRevision = calendarId
       ? revisionValue(input.calendarRevision)
@@ -281,8 +288,8 @@ export async function mutateMeeting(
       : '?';
     const work = [
       c.db
-        .prepare(`INSERT OR IGNORE INTO meetings (org,id,spaceId,prospectId,title,startsAt,agenda,notes,decisions,participants,status,revision,updatedAt,lastMutation,fingerprint)
-      SELECT ?,?,${spaceSql},?,?,?,?,?,?,?,'Planned',0,?,?,? WHERE ${contextGuard}${calendarId ? " AND EXISTS (SELECT 1 FROM calendarEvents WHERE org=? AND id=? AND revision=? AND archived=0 AND kind='meeting' AND meetingId IS NULL)" : ''}${taskId ? ' AND EXISTS (SELECT 1 FROM tasks WHERE org=? AND id=? AND revision=? AND archived=0 AND meetingId IS NULL)' : ''}`)
+        .prepare(`INSERT OR IGNORE INTO meetings (org,id,spaceId,prospectId,title,startsAt,agenda,notes,decisions,participants,recurrence,status,revision,updatedAt,lastMutation,fingerprint)
+      SELECT ?,?,${spaceSql},?,?,?,?,?,?,?,?,'Planned',0,?,?,? WHERE ${contextGuard}${calendarId ? " AND EXISTS (SELECT 1 FROM calendarEvents WHERE org=? AND id=? AND revision=? AND archived=0 AND kind='meeting' AND meetingId IS NULL)" : ''}${taskId ? ' AND EXISTS (SELECT 1 FROM tasks WHERE org=? AND id=? AND revision=? AND archived=0 AND meetingId IS NULL)' : ''}`)
         .bind(
           c.org,
           id,
@@ -403,6 +410,12 @@ export async function mutateMeeting(
       'Participants',
       3000,
     ),
+    recurrence: (() => {
+      const value = input.recurrence ?? meeting.recurrence ?? '';
+      if (!validRecurrence(value))
+        throw new AppError('Choose a supported meeting rhythm.');
+      return value;
+    })(),
     status,
   };
   const googleSource = await c.db
@@ -503,4 +516,76 @@ export async function mutateMeeting(
       'This meeting changed in another session. Your draft is preserved.',
       409,
     );
+}
+
+
+// Materialize the next occurrence of recurring meetings whose time has passed.
+// Runs on workspace reads — the same while-the-app-is-open pattern calendar
+// sync uses. One upcoming occurrence per chain: the catch-up math lands in the
+// future, the guarded insert makes concurrent reads converge on one row, and a
+// cancelled occurrence does not end the rhythm (removing the rhythm does).
+export async function materializeRecurringMeetings(c: Context, now = new Date()) {
+  const due = await c.db
+    .prepare(
+      `SELECT * FROM meetings m WHERE org=? AND recurrence<>'' AND startsAt<?
+       AND NOT EXISTS (
+         SELECT 1 FROM meetings s WHERE s.org=m.org
+         AND (CASE WHEN s.recurrenceOf='' THEN s.id ELSE s.recurrenceOf END)
+           = (CASE WHEN m.recurrenceOf='' THEN m.id ELSE m.recurrenceOf END)
+         AND s.startsAt>m.startsAt
+       ) LIMIT 10`,
+    )
+    .bind(c.org, now.toISOString())
+    .all<Meeting & { recurrence: string; recurrenceOf: string }>();
+  for (const meeting of due.results || []) {
+    const startsAt = nextMeetingStart(meeting.recurrence, meeting.startsAt, now);
+    if (!startsAt) continue;
+    const chain = meeting.recurrenceOf || meeting.id;
+    const id = crypto.randomUUID();
+    const stamp = now.toISOString();
+    await c.db.batch([
+      c.db
+        .prepare(
+          `INSERT INTO meetings (org,id,spaceId,prospectId,title,startsAt,agenda,notes,decisions,participants,recurrence,recurrenceOf,status,revision,updatedAt,lastMutation,fingerprint)
+           SELECT ?,?,?,?,?,?,?,'','',?,?,?,'Planned',0,?,?,'' WHERE NOT EXISTS (
+             SELECT 1 FROM meetings WHERE org=? AND recurrenceOf=? AND startsAt=?
+           )`,
+        )
+        .bind(
+          c.org,
+          id,
+          meeting.spaceId,
+          meeting.prospectId ?? null,
+          meeting.title,
+          startsAt,
+          meeting.agenda,
+          meeting.participants ?? '',
+          meeting.recurrence,
+          chain,
+          stamp,
+          crypto.randomUUID(),
+          c.org,
+          chain,
+          startsAt,
+        ),
+      c.db
+        .prepare(
+          `INSERT INTO spaceEvents (org,id,spaceId,prospectId,meetingId,body,snapshot,actor,createdAt)
+           SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM meetings WHERE org=? AND id=?)`,
+        )
+        .bind(
+          c.org,
+          crypto.randomUUID(),
+          meeting.spaceId,
+          meeting.prospectId ?? null,
+          id,
+          'Scheduled the next ' + meeting.recurrence + ' meeting',
+          JSON.stringify({ title: meeting.title, startsAt }),
+          c.actor,
+          stamp,
+          c.org,
+          id,
+        ),
+    ]);
+  }
 }

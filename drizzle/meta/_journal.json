@@ -134,6 +134,13 @@
       "when": 1789059073228,
       "tag": "0018_soft_roulette",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1789115282336,
+      "tag": "0019_known_doctor_spectrum",
+      "breakpoints": true
     }
   ]
 }

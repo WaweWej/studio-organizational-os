@@ -14,8 +14,10 @@ import {
   type SlackEventKind,
 } from './slack';
 import { mutateEntry, captureInsert } from './entry-store';
+import { validRecurrence, nextDueDate } from './recurrence';
 import { mutateSales } from './sales-store';
 import { mutateResource, upgradeResources } from './resource-store';
+import { materializeRecurringMeetings } from './meeting-store';
 import { mutateClient } from './client-store';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
@@ -109,6 +111,11 @@ export async function context(): Promise<Context> {
   };
   await seed(c);
   await upgradeResources(c);
+  try {
+    await materializeRecurringMeetings(c);
+  } catch {
+    /* Reading the workspace never fails on rhythm bookkeeping. */
+  }
   return c;
 }
 async function seed(c: Context) {
@@ -662,6 +669,48 @@ export async function mutate(
     updates.stage = 'Done';
     updates.delivery = 'Internal completion';
     activity = task.stage === 'Review' ? 'Completed task and closed the review request' : 'Completed task';
+    // A recurring task spawns its next occurrence in the same transaction that
+    // completes it: no scheduler, exactly once per completion, and an
+    // unattended task stays a single overdue item instead of multiplying.
+    if (task.recurrence && validRecurrence(task.recurrence)) {
+      const nextDue = nextDueDate(task.recurrence, task.due, now.slice(0, 10));
+      activity += ' · next occurrence scheduled for ' + nextDue;
+      secondary.push(
+        insert(
+          c.db,
+          'tasks',
+          c.org,
+          {
+            id: crypto.randomUUID(),
+            title: task.title,
+            prospectId: task.prospectId ?? null,
+            projectId: task.projectId,
+            spaceId: task.spaceId,
+            assignee: task.assignee,
+            reviewer: task.reviewer,
+            stage: 'Up next',
+            description: task.description,
+            due: nextDue,
+            dueTime: task.dueTime || '',
+            priority: task.priority,
+            blocked: '',
+            deliverable: task.deliverable,
+            delivery: 'Not configured',
+            version: 0,
+            recurrence: task.recurrence,
+            recurrenceOf: task.recurrenceOf || task.id,
+            reviewRequired: task.reviewRequired ?? 0,
+            revision: 0,
+            position: task.position,
+            plannedFor: '',
+            focusFor: '',
+            archived: 0,
+            updatedAt: now,
+          },
+          guard,
+        ),
+      );
+    }
     // Completion closes a pending request without claiming the work was approved.
     // Existing decisions and their version snapshots remain in the history.
     secondary.push(
@@ -739,6 +788,11 @@ export async function mutate(
       true,
     );
     updates.reviewer = textValue(input.reviewer, 'Reviewer', 100, true);
+    if (input.recurrence !== undefined) {
+      if (!validRecurrence(input.recurrence))
+        throw new AppError('Choose a supported rhythm.');
+      updates.recurrence = input.recurrence;
+    }
     await exists(c, 'members', String(updates.assignee));
     await exists(c, 'members', String(updates.reviewer));
     if (task.reviewer !== updates.reviewer && task.stage === 'Review') {

@@ -40,6 +40,8 @@ export type Meeting = {
   notes: string;
   decisions: string;
   status: 'Planned' | 'Completed' | 'Cancelled';
+  recurrence?: string;
+  recurrenceOf?: string;
   revision: number;
   updatedAt: string;
 };
@@ -82,6 +84,8 @@ export type Task = {
   deliverable: string;
   delivery: string;
   version: number;
+  recurrence?: string;
+  recurrenceOf?: string;
   revision: number;
   position: number;
   updatedAt: string;

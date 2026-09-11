@@ -1431,6 +1431,7 @@ function NewMeeting({
       title: form.get('title'),
       startsAt: new Date(form.get('startsAt') as string).toISOString(),
       agenda: form.get('agenda'),
+      recurrence: form.get('recurrence') || '',
     });
   };
   return (
@@ -1447,8 +1448,18 @@ function NewMeeting({
       <Field label="Date & time">
         <Input type="datetime-local" name="startsAt" required />
       </Field>
+      <Field label="Repeats">
+        <select name="recurrence" defaultValue="" aria-label="Meeting rhythm">
+          <option value="">Does not repeat</option>
+          <option value="weekly">Weekly</option>
+          <option value="biweekly">Every two weeks</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+        </select>
+      </Field>
       <p className="cf-form-hint">
-        Your local time · this does not send a calendar invitation.
+        Your local time · this does not send a calendar invitation. A repeating
+        meeting schedules its next occurrence once this one has passed.
       </p>
       <Field label="What do we need to discuss?">
         <Textarea

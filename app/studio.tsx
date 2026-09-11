@@ -20,6 +20,7 @@ import WorkBoard from './work-board';
 import ReviewRequest from './review-request';
 import QuickCapture, { type CaptureDraft } from './quick-capture';
 import ClientDirectory from './client-directory';
+import { recurrenceLabel } from '@/lib/recurrence';
 import SharedCalendar from './shared-calendar';
 import { useGoogleCalendarSync } from './google-calendar';
 import ResourceLibrary, {
@@ -1210,6 +1211,7 @@ function TaskDetail({
       blocked: f.get('blocked'),
       assignee,
       reviewer: task.reviewer,
+      recurrence: f.get('recurrence') ?? '',
     });
   };
   return (
@@ -1239,6 +1241,9 @@ function TaskDetail({
         <Avatar member={member} small />
         <span>{member?.name}</span>
         {task.version > 0 && <span className="quiet-meta">Version {task.version}</span>}
+        {!!task.recurrence && (
+          <span className="quiet-meta">{recurrenceLabel(task.recurrence)}</span>
+        )}
         {task.stage !== 'Done' && <Button disabled={busy} onClick={() => void cmd('complete')}>Complete task</Button>}
       </div>
       {task.blocked && (
@@ -1359,6 +1364,20 @@ function TaskDetail({
                       defaultValue={task.blocked}
                       placeholder="Nothing blocking"
                     />
+                  </label>
+                  <label>
+                    Repeats
+                    <select
+                      name="recurrence"
+                      defaultValue={task.recurrence || ''}
+                      aria-label="Task rhythm"
+                    >
+                      <option value="">Does not repeat</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Every two weeks</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                    </select>
                   </label>
                 </div>
                 <Button type="submit" variant="outline" disabled={busy}>
