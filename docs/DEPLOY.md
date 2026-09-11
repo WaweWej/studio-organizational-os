@@ -43,26 +43,44 @@ repository stays green before setup.
 ## Turning on sign-in
 
 Fresh deployments answer every request with "Sign in to access your
-workspace" — the workspace fails closed until identity exists. Identity comes
-from Cloudflare Access (free for up to 50 users):
+workspace" — the workspace fails closed until identity exists. Studio carries
+its own sign-in: GitHub for you, Google for the team, both gated by explicit
+allowlists. No Cloudflare Zero Trust plan (and no payment card) is required.
 
-1. one.dash.cloudflare.com → complete the short Zero Trust onboarding and
-   choose a team name — note it, it is your `<team>` below.
-2. Access → Applications → Add an application → Self-hosted. Application
-   domain: `studio.<your-subdomain>.workers.dev`. Add a policy that allows
-   your email address (and teammates' as needed). Save.
-3. On the application's overview, copy the **Application Audience (AUD)
-   tag**.
-4. Dashboard → Workers & Pages → studio → Settings → Variables and Secrets,
-   add two variables:
-   - `STUDIO_ACCESS_TEAM` — your team name (the `<team>` of
-     `<team>.cloudflareaccess.com`)
-   - `STUDIO_ACCESS_AUD` — the audience tag
+**GitHub sign-in (the owner):**
 
-Visiting the URL now shows Cloudflare's sign-in, and Studio verifies the
-signed identity cryptographically on every request — audience, issuer,
-expiry, and signature against your team's published keys. Each signed-in
-email gets its own workspace.
+1. github.com → Settings → Developer settings → OAuth Apps → New OAuth App:
+   - Application name: `Studio`
+   - Homepage URL: `https://studio.<your-subdomain>.workers.dev`
+   - Authorization callback URL:
+     `https://studio.<your-subdomain>.workers.dev/api/auth/github/callback`
+2. Register, then copy the **Client ID** and generate a **client secret**.
+3. Cloudflare dashboard → Workers & Pages → studio → Settings → Variables and
+   Secrets, add:
+   - `STUDIO_GITHUB_CLIENT_ID` — the client ID (plain variable)
+   - `STUDIO_GITHUB_CLIENT_SECRET` — the secret (type: Secret)
+   - `STUDIO_ALLOWED_LOGINS` — GitHub usernames allowed in, comma-separated,
+     e.g. `WaweWej`
+
+**Google sign-in (the team):** uses the same Google OAuth app as the
+Calendar/Drive connection — set it up once under "Connecting Google Calendar
+and Drive" below, add
+`https://studio.<your-subdomain>.workers.dev/api/auth/google/callback` as a
+second authorized redirect URI, and add one more worker variable:
+
+   - `STUDIO_ALLOWED_EMAILS` — exact addresses and/or whole domains,
+     comma-separated, e.g. `gabriel@wawe.dk, @homeymedia.dk`
+
+Visiting the URL now shows the sign-in page with a button per configured
+provider. Google identities require a verified email; anyone outside the
+allowlists is told so truthfully. Each signed-in identity gets its own
+workspace, and sessions are signed with a key the app generates for itself —
+deleting the `session` row in the `authKeys` table signs everyone out.
+
+**Alternative:** deployments behind Cloudflare Access (Zero Trust) are also
+supported — set `STUDIO_ACCESS_TEAM` and `STUDIO_ACCESS_AUD` and Studio
+verifies the Access JWT instead. Note that enabling Zero Trust requires a
+payment card on file with Cloudflare.
 
 ## Connecting Google Calendar and Drive
 

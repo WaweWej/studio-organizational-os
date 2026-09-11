@@ -579,3 +579,11 @@ export const fileBlobs = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.org, t.key] })],
 );
+
+// Keys the app generates for itself (session signing). Deleting the session
+// row signs everyone out.
+export const authKeys = sqliteTable('authKeys', {
+  id: text('id').primaryKey(),
+  value: text('value').notNull(),
+  createdAt: text('createdAt').notNull(),
+});

@@ -77,7 +77,9 @@ function isReservedAuthPath(pathname: string): boolean {
   return (
     pathname === SIGN_IN_PATH ||
     pathname === SIGN_OUT_PATH ||
-    pathname === CALLBACK_PATH
+    pathname === CALLBACK_PATH ||
+    pathname === '/signin' ||
+    pathname.startsWith('/api/auth/')
   );
 }
 

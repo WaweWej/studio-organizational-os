@@ -1,0 +1,53 @@
+.signin {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background, #faf9f6);
+}
+.signin-card {
+  width: min(24rem, 92vw);
+  padding: 2.6rem 2.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fff;
+  text-align: center;
+}
+.signin-mark {
+  margin: 0 0 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.signin-card h1 {
+  margin: 0 0 1.6rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+.signin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.signin-actions a {
+  display: block;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  font-size: 0.95rem;
+}
+.signin-actions a:hover {
+  border-color: rgba(0, 0, 0, 0.4);
+}
+.signin-error {
+  margin: 0 0 1.2rem;
+  font-size: 0.86rem;
+  color: #a03d2e;
+}
+.signin-note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: rgba(0, 0, 0, 0.6);
+  line-height: 1.5;
+}

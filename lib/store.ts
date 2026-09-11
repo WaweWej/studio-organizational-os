@@ -99,11 +99,17 @@ export async function context(): Promise<Context> {
     fullName: string | null;
   } | null = await getChatGPTUser();
   if (!user) {
-    // Self-hosted deployments sit behind Cloudflare Access; identity comes
-    // from its verified JWT and only when the Access settings are configured.
+    // Self-hosted identity: Cloudflare Access's verified JWT when those
+    // settings exist, otherwise the app's own signed session from GitHub or
+    // Google sign-in. Both fail closed when unconfigured.
     const { headers } = await import('next/headers');
+    const requestHeaders = await headers();
     const { getAccessUser } = await import('./access-auth');
-    user = await getAccessUser({ headers: await headers() });
+    user = await getAccessUser({ headers: requestHeaders });
+    if (!user && env.DB) {
+      const { sessionUser } = await import('./session');
+      user = await sessionUser({ db: env.DB }, requestHeaders.get('cookie'));
+    }
   }
   if (!user && import.meta.env.DEV)
     user = {

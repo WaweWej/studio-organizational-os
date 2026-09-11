@@ -363,3 +363,22 @@ tests/file-store.mjs covers round-trips, the cap, and tenant isolation.
 Known debt: tests/resources.mjs expects a legacy starter fixture and fails on
 pristine code in fresh clones, same class as the other fixture-dependent
 suites.
+
+## Studio's own front door · 11 September 2026
+
+Cloudflare Zero Trust requires a payment card, so self-hosted sign-in now
+lives in the app: GitHub for the owner and Google for the team, both standard
+authorization-code flows exchanged server-side with signed, expiring state.
+Nobody gets in without passing the explicit allowlists — GitHub usernames in
+STUDIO_ALLOWED_LOGINS, exact addresses or whole domains in
+STUDIO_ALLOWED_EMAILS — and an authenticated identity outside them is told so
+truthfully. Sessions are HMAC-signed cookies keyed by a secret the app
+generates for itself and keeps in the database (deleting it signs everyone
+out); Google identities require a verified email; return paths survive the
+round trip only when they are same-app relative. A quiet /signin page offers
+exactly the configured providers, the root page routes signed-out visitors
+there, and unconfigured deployments keep failing closed. Google sign-in
+shares the Calendar/Drive OAuth app, so one Google setup serves both. The
+Cloudflare Access path remains supported as an alternative. Migration 0021;
+tests/login-auth.mjs covers sessions, state, allowlists, both provider
+exchanges, and the refusals.
