@@ -158,12 +158,18 @@ export async function googleRequest<T>(
   const { oauthErrorCode, ...requestInit } = init;
   let response: Response;
   try {
+    // workerd accepts only 'follow' and 'manual'; a redirect from a fixed
+    // Google endpoint is refused rather than followed.
     response = await fetcher(url, {
       ...requestInit,
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(15000),
     });
   } catch {
+    throw new GoogleError(0);
+  }
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel();
     throw new GoogleError(0);
   }
   if (!response.ok) {

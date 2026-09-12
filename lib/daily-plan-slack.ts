@@ -54,7 +54,7 @@ export async function deliverDailyPlan(
     // Plain text blocks prevent task text from generating Slack mentions.
     const response = await send(url, {
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(8000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

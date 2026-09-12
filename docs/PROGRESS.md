@@ -393,3 +393,15 @@ deploy now passes --keep-vars, so dashboard-set variables and secrets persist
 across every push. Found through the new connection self-examination, whose
 report showed the client ID and redirect URI missing while both secrets
 remained.
+
+## The runtime speaks only follow and manual · 12 September 2026
+
+Every hardened outbound fetch passed redirect: 'error', which the production
+Workers runtime refuses outright — "must be one of follow or manual" — so the
+Google token exchange threw before any network happened, reported as status
+0. Mocked fetchers and lenient local dev never caught it; a scratch worker in
+real workerd confirmed it verbatim. All four occurrences (Google requests,
+Slack delivery, daily-plan delivery) now use redirect: 'manual', and the
+Google wrapper refuses any 3xx explicitly, preserving the never-follow
+intent. Slack's delivery truthfulness already treats unconfirmed responses as
+failed or unknown, so returned redirects land safely there.

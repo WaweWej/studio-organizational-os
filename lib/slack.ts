@@ -136,7 +136,7 @@ export async function deliverSlackMessages(
       if (transport.mode === 'bot') {
         const response = await send('https://slack.com/api/chat.postMessage', {
           method: 'POST',
-          redirect: 'error',
+          redirect: 'manual',
           signal: AbortSignal.timeout(8000),
           headers: {
             'Content-Type': 'application/json; charset=utf-8',
@@ -163,7 +163,7 @@ export async function deliverSlackMessages(
       } else {
         const response = await send(transport.url, {
           method: 'POST',
-          redirect: 'error',
+          redirect: 'manual',
           signal: AbortSignal.timeout(8000),
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
