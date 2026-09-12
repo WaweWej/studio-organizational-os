@@ -21,6 +21,109 @@ export async function GET(request: Request) {
   try {
     const c = await context(),
       status = await googleStatus(c, config());
+    // Signed-in self-examination of the Google plumbing. Reports shapes and
+    // reachability truthfully; never echoes secrets. The token endpoint is
+    // probed with a deliberately invalid grant, so a healthy answer is
+    // Google's own 400/invalid_grant.
+    if (new URL(request.url).searchParams.get('action') === 'diagnose') {
+      const raw = config();
+      const { cleanGoogleConfig, googleConfigured } = await import(
+        '@/lib/google-calendar-auth'
+      );
+      const cleaned = cleanGoogleConfig(raw);
+      const report: Record<string, unknown> = {
+        configured: googleConfigured(raw),
+        clientIdShape: cleaned.GOOGLE_CLIENT_ID
+          ? cleaned.GOOGLE_CLIENT_ID.endsWith('.apps.googleusercontent.com')
+            ? 'ok'
+            : 'does not end with .apps.googleusercontent.com'
+          : 'missing',
+        clientSecret: cleaned.GOOGLE_CLIENT_SECRET ? 'present' : 'missing',
+        redirectUri: cleaned.GOOGLE_REDIRECT_URI || 'missing',
+        tokenKey: (() => {
+          try {
+            const bytes = atob(
+              (cleaned.GOOGLE_TOKEN_KEY || '')
+                .replace(/-/g, '+')
+                .replace(/_/g, '/'),
+            ).length;
+            return bytes === 32 ? 'ok (32 bytes)' : `wrong length (${bytes} bytes)`;
+          } catch {
+            return 'not valid base64';
+          }
+        })(),
+      };
+      try {
+        const { seal, unseal } = await import('@/lib/google-calendar-auth');
+        const sealed = await seal(cleaned, 'diagnostic-probe', 'diag');
+        report.tokenKeyCrypto =
+          (await unseal(cleaned, sealed, 'diag')) === 'diagnostic-probe'
+            ? 'ok'
+            : 'round-trip mismatch';
+      } catch (e) {
+        report.tokenKeyCrypto =
+          'failed: ' + (e instanceof Error ? e.name + ' ' + e.message : String(e));
+      }
+      try {
+        const probe = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: cleaned.GOOGLE_CLIENT_ID || 'missing',
+            client_secret: cleaned.GOOGLE_CLIENT_SECRET || 'missing',
+            grant_type: 'authorization_code',
+            code: 'diagnostic-probe',
+            redirect_uri: cleaned.GOOGLE_REDIRECT_URI || 'https://example.com',
+          }),
+          signal: AbortSignal.timeout(10000),
+        });
+        const body = (await probe.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        report.tokenEndpoint = {
+          status: probe.status,
+          error: body.error || null,
+          verdict:
+            probe.status === 400 && body.error === 'invalid_grant'
+              ? 'healthy: Google reachable and this client is recognized'
+              : body.error === 'invalid_client'
+                ? 'Google does not recognize GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET'
+                : 'unexpected',
+        };
+      } catch (e) {
+        report.tokenEndpoint = {
+          status: 0,
+          verdict:
+            'unreachable from this worker: ' +
+            (e instanceof Error ? e.name + ' ' + e.message : String(e)),
+        };
+      }
+      try {
+        const reach = await fetch(
+          'https://www.googleapis.com/calendar/v3/users/me/calendarList',
+          {
+            headers: { Authorization: 'Bearer diagnostic-probe' },
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        await reach.body?.cancel();
+        report.calendarApi = {
+          status: reach.status,
+          verdict:
+            reach.status === 401
+              ? 'healthy: reachable (rejects the probe token as expected)'
+              : 'unexpected',
+        };
+      } catch (e) {
+        report.calendarApi = {
+          status: 0,
+          verdict:
+            'unreachable from this worker: ' +
+            (e instanceof Error ? e.name + ' ' + e.message : String(e)),
+        };
+      }
+      return json(report);
+    }
     if (
       new URL(request.url).searchParams.get('calendars') === '1' &&
       status.connected
