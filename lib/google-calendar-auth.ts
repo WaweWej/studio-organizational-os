@@ -136,7 +136,7 @@ export class GoogleError extends AppError {
                   ? 'The Google sign-in code expired or was already used (invalid_grant). Start the connection again.'
                   : oauthCode
                     ? `Google refused the connection (${oauthCode}).`
-                    : 'Google Calendar could not be reached. Your Studio work is saved; try syncing again.',
+                    : `Google Calendar could not be reached (status ${googleStatus}). Your Studio work is saved; try syncing again.`,
       502,
     );
     this.googleStatus = googleStatus;

@@ -35,6 +35,9 @@ export async function GET(request: Request) {
       headers: { ...headers, Location: '/?view=calendar&google=connected' },
     });
   } catch (error) {
+    // The exception itself (never tokens) goes to the worker's log stream so
+    // a live tail during a reproduction names the failing step.
+    console.error('google-calendar callback failed', error);
     return new Response(
       (error instanceof AppError
         ? error.message

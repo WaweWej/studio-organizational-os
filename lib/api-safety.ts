@@ -11,6 +11,8 @@ export function json(body: unknown, status = 200) {
   });
 }
 export function apiFailure(error: unknown) {
+  if (!(error instanceof AppError))
+    console.error('unexpected api failure', error);
   return json(
     {
       error:
