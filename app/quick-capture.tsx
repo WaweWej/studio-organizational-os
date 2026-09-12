@@ -1,5 +1,13 @@
 'use client';
 import { DraftCache } from '@/lib/draft-cache';
+import { parseSurfaceIntent } from '@/lib/desk-surfaces';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import {
   commandQuery,
   commandSuggestions,
@@ -174,6 +182,47 @@ export default function QuickCapture({
   const slash = commandQuery(text),
     actionMenuOpen = slash !== null;
   const actions = actionMenuOpen ? commandSuggestions(slash) : [];
+  // A surface intent opens a place instead of creating an entry.
+  const surface =
+    !actionMenuOpen && kind === 'auto' ? parseSurfaceIntent(text, data) : null;
+  const [logPanel, setLogPanel] = useState<{
+    spaceId: string;
+    spaceName: string;
+    body: string;
+  } | null>(null);
+  const [logSaving, setLogSaving] = useState(false);
+  const logRequest = useRef<{ fingerprint: string; id: string } | null>(null);
+  const saveLog = async () => {
+    if (!logPanel || !logPanel.body.trim() || logSaving || busy || !ready)
+      return;
+    const command = {
+      type: 'capture-entry',
+      kind: 'note',
+      captureText: logPanel.body,
+      captureDay: localDay(new Date()),
+      contextProject: null,
+      contextSpace: logPanel.spaceId,
+      pins: [],
+      targetType: 'space',
+      targetId: logPanel.spaceId,
+      meetingDate: '',
+      meetingTime: '',
+      meetingOffset: null,
+    };
+    const fingerprint = JSON.stringify(command);
+    if (logRequest.current?.fingerprint !== fingerprint)
+      logRequest.current = { fingerprint, id: crypto.randomUUID() };
+    setLogSaving(true);
+    try {
+      if (await act({ ...command, captureId: logRequest.current.id })) {
+        logRequest.current = null;
+        setLogPanel(null);
+        requestAnimationFrame(() => input.current?.focus());
+      }
+    } finally {
+      setLogSaving(false);
+    }
+  };
   const action = actions.find((a) => 'action:' + a.id === choice) || actions[0];
   const update = isTaskUpdate(entry.kind);
   const updatingTask = data.tasks.find((t) => t.id === entry.taskId);
@@ -364,6 +413,18 @@ export default function QuickCapture({
       return;
     }
     setAttempted(true);
+    if (surface) {
+      setLogPanel({
+        spaceId: surface.spaceId,
+        spaceName: surface.spaceName,
+        body: surface.seed,
+      });
+      setText('');
+      setPins([]);
+      setCaret(0);
+      setAttempted(false);
+      return;
+    }
     if (entry.errors.length || submitting.current || busy || !ready) return;
     if (entry.kind === 'meeting') {
       const date = new Date(`${entry.meetingDate}T${entry.meetingTime}:00`);
@@ -808,7 +869,20 @@ export default function QuickCapture({
           </CommandList>
         )}
       </Command>
-      {[
+      {surface && text.trim() && !actionMenuOpen && (
+        <div className="entry-routing">
+          <div className="entry-route-copy">
+            <span>Opens</span>
+            <strong>{surface.spaceName} — log</strong>
+            <small className="capture-impact">
+              Write the entry there; it is stored on the client&rsquo;s
+              timeline.
+            </small>
+          </div>
+        </div>
+      )}
+      {!surface &&
+        [
         'note',
         'meeting',
         'deadline',
@@ -1074,7 +1148,9 @@ export default function QuickCapture({
             ) : (
               <ArrowUp size={17} />
             ))}
-          {variant === 'desk'
+          {surface
+            ? 'Open log'
+            : variant === 'desk'
             ? saving
               ? 'Saving…'
               : 'Save'
@@ -1113,6 +1189,57 @@ export default function QuickCapture({
           </button>
         </output>
       )}
+      <Dialog
+        open={!!logPanel}
+        onOpenChange={(value) => {
+          if (!value && !logSaving) setLogPanel(null);
+        }}
+      >
+        <DialogContent className="fc-dialog log-panel-dialog">
+          <DialogHeader>
+            <DialogTitle>{logPanel?.spaceName} — log</DialogTitle>
+            <DialogDescription>
+              Saved to this client&rsquo;s timeline when you store it.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            className="log-panel-body"
+            rows={6}
+            ref={(node) => node?.focus()}
+            value={logPanel?.body || ''}
+            placeholder="What happened?"
+            onChange={(e) =>
+              setLogPanel(
+                (previous) =>
+                  previous && { ...previous, body: e.target.value },
+              )
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                void saveLog();
+              }
+            }}
+          />
+          <footer className="log-panel-actions">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={logSaving}
+              onClick={() => setLogPanel(null)}
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              disabled={logSaving || !logPanel?.body.trim() || busy || !ready}
+              onClick={() => void saveLog()}
+            >
+              {logSaving ? 'Storing…' : 'Store & close'}
+            </Button>
+          </footer>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

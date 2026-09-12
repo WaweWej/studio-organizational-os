@@ -44,12 +44,8 @@ export function inferEntryKind(text: string): EntryKind {
   const intent = matchEntryIntent(text);
   if (intent) return intent.kind;
   if (/^\s*sales\s+meeting\s+with\b/i.test(text)) return 'sales';
-  if (
-    /^\s*(task\s*:|book|edit|write|send|call|prepare|create|build|review|finish|update|check|calculate|plan|design|record|publish|schedule|follow up|confirm|fix|draft|research|add|make|connect|document|deliver|set up)\b/i.test(
-      text,
-    )
-  )
-    return 'task';
+  // The owner's law: only explicit task phrasing creates tasks. Everything
+  // else is kept as written — a note — never turned into a chore.
   return 'note';
 }
 export function interpretEntry(

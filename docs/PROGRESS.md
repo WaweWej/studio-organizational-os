@@ -405,3 +405,20 @@ Slack delivery, daily-plan delivery) now use redirect: 'manual', and the
 Google wrapper refuses any 3xx explicitly, preserving the never-follow
 intent. Slack's delivery truthfulness already treats unconfirmed responses as
 failed or unknown, so returned redirects land safely there.
+
+## Only "add task" makes tasks; the log opens when asked · 12 September 2026
+
+The interpreter's verb heuristic — any sentence starting with an action verb
+became a task — is gone by the owner's law: only explicit task phrasing
+(task:, add task, new task, /task) creates tasks, and everything else is
+kept as written, a note, never turned into a chore. Alongside it, the first
+surface intents: "add to <client> log", "open <client> log", or
+"<client> log" resolves the client deterministically (exact name, unique
+prefix, or unique word; ambiguity refuses) and opens a log panel seeded with
+any trailing text — write, Store & close, and the entry lands on the
+client's timeline through the ordinary capture-entry command with an
+idempotent id. And the first piece of the assistant ground: a typed command
+catalog (lib/command-catalog.ts, forty commands with groups, risk classes,
+and field shapes) served to signed-in callers at /api/commands, held against
+the boundary's real dispatch strings by tests/command-catalog.mjs so the map
+cannot drift from the territory.

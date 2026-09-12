@@ -5,7 +5,10 @@ import { inferEntryKind, interpretEntry } from '../lib/entry-model.ts';
 const data = initialWorkspace(),
   now = new Date(2026, 8, 9, 12);
 assert.equal(inferEntryKind('The client prefers a quieter opening'), 'note');
-assert.equal(inferEntryKind('Edit the launch video'), 'task');
+// The owner's law (September 2026): only explicit task phrasing creates
+// tasks; verb-shaped sentences stay as written, as notes.
+assert.equal(inferEntryKind('Edit the launch video'), 'note');
+assert.equal(inferEntryKind('add task edit the launch video'), 'task');
 assert.equal(inferEntryKind('Task: follow up'), 'task');
 assert.equal(
   inferEntryKind('Meeting notes @nord: agreed a new direction'),
