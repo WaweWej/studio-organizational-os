@@ -16,7 +16,7 @@ const { readFileSync, readdirSync } = await import('node:fs');
 
 const names = commandCatalog.map((c) => c.name);
 assert.equal(new Set(names).size, names.length, 'names are unique');
-const groups = new Set(['capture','tasks','projects','clients','meetings','planning','calendar','sales','library']);
+const groups = new Set(['capture','tasks','projects','clients','meetings','planning','calendar','sales','library','access']);
 for (const c of commandCatalog) {
   assert.ok(groups.has(c.group), c.name + ' group');
   assert.ok(['write','destructive'].includes(c.risk), c.name + ' risk');

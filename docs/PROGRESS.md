@@ -435,3 +435,22 @@ navigate — the shell answers them with its own navigate/space/project
 functions — so composers embedded elsewhere are unaffected, and the same
 phrases fall through to notes there. The log form keeps precedence: "open
 Rørvig Teater log" opens the log, "open Rørvig Teater" opens the client.
+
+## The boundary opens outward · 12 September 2026
+
+Scoped API tokens complete the assistant plan's first phase: the command
+boundary now has an external door. Tokens are minted in Systems — the
+secret shown exactly once, only its SHA-256 hash stored, lookup by hash —
+and speak as their workspace with provenance stamped into history as
+api:<name>. The command catalog graduated from documentation to
+enforcement: every token-authenticated command is gated on the catalog's
+groups, destructive commands additionally require the destructive scope,
+uncataloged commands are refused outright, and tokens can never manage
+tokens. Bearer requests bypass the browser-origin guard (which defends
+cookie sessions; tokens are not cookie-borne) and revocation is immediate.
+Proven end to end against the running server: mint, read the 42-command
+catalog, read the workspace, write a client-log note that landed with
+actor api:Viktor, hit the scope wall with a truthful refusal, revoke.
+docs/API.md is the external caller's guide. Migration 0022;
+tests/api-tokens.mjs covers hashing, resolution, the gate, and the
+refusals.

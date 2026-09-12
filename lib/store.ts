@@ -68,6 +68,8 @@ export type Context = {
   actor: string;
   name: string;
   db: D1Database;
+  // Present only for API-token identities; mutate() gates commands on it.
+  tokenScopes?: string[];
 };
 type DataRow = Record<string, string | number | null>;
 function insert(
@@ -109,6 +111,26 @@ export async function context(): Promise<Context> {
     if (!user && env.DB) {
       const { sessionUser } = await import('./session');
       user = await sessionUser({ db: env.DB }, requestHeaders.get('cookie'));
+    }
+    if (!user && env.DB) {
+      // Scoped API tokens speak as their workspace, with provenance and
+      // with the scope gate applied to every command.
+      const { tokenFromHeader, parseScopes } = await import('./api-tokens');
+      const row = await tokenFromHeader(
+        { db: env.DB },
+        requestHeaders.get('authorization'),
+      );
+      if (row) {
+        const c = {
+          org: row.org,
+          actor: 'api:' + row.name,
+          name: row.name,
+          db: env.DB,
+          tokenScopes: parseScopes(row.scopes),
+        };
+        await seed(c);
+        return c;
+      }
     }
   }
   if (!user && import.meta.env.DEV)
@@ -287,6 +309,16 @@ export async function mutate(
   const type = textValue(input.type, 'Action', 40, true),
     now = new Date().toISOString(),
     nonce = crypto.randomUUID();
+  if (c.tokenScopes) {
+    const { enforceTokenScopes } = await import('./api-tokens');
+    enforceTokenScopes(c.tokenScopes, type);
+  }
+  if (type === 'token-create' || type === 'token-revoke') {
+    const { createToken, revokeToken } = await import('./api-tokens');
+    if (type === 'token-create') await createToken(c, input);
+    else await revokeToken(c, input);
+    return;
+  }
   if (type === 'day-work') { await changeDayWork(c,input); return; }
   if (type === 'daily-plan-commit') {
     await commitDailyPlan(

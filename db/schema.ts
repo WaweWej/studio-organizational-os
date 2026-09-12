@@ -587,3 +587,27 @@ export const authKeys = sqliteTable('authKeys', {
   value: text('value').notNull(),
   createdAt: text('createdAt').notNull(),
 });
+
+// Scoped API tokens: external speakers of the command boundary (Viktor and
+// friends). Only the SHA-256 hash is stored; the secret is shown once at
+// minting. Scopes are catalog groups, plus 'read' for workspace reads and
+// 'destructive' as an extra lock destructive commands additionally require.
+export const apiTokens = sqliteTable(
+  'apiTokens',
+  {
+    org: text('org').notNull(),
+    id: text('id').notNull(),
+    name: text('name').notNull(),
+    tokenHash: text('tokenHash').notNull(),
+    prefix: text('prefix').notNull(),
+    scopes: text('scopes').notNull(),
+    createdBy: text('createdBy').notNull(),
+    createdAt: text('createdAt').notNull(),
+    lastUsedAt: text('lastUsedAt').notNull().default(''),
+    revokedAt: text('revokedAt').notNull().default(''),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    uniqueIndex('tokens_by_hash').on(t.tokenHash),
+  ],
+);

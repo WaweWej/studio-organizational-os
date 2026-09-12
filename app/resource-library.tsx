@@ -1433,7 +1433,191 @@ export function BlueprintRegistry() {
           </form>
         </DialogContent>
       </Dialog>
+      <ApiAccessPanel />
     </>
+  );
+}
+
+// API access: scoped workspace tokens, minted and revoked here. The secret
+// appears exactly once at minting; the list shows prefixes only.
+type ApiTokenListRow = {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string;
+  createdAt: string;
+  lastUsedAt: string;
+};
+function ApiAccessPanel() {
+  const [state, setState] = useState<{
+    tokens: ApiTokenListRow[];
+    scopes: string[];
+  } | null>(null);
+  const [error, setError] = useState('');
+  const [minting, setMinting] = useState(false);
+  const [name, setName] = useState('');
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [minted, setMinted] = useState<{ name: string; secret: string } | null>(
+    null,
+  );
+  const load = async () => {
+    try {
+      const r = await fetch('/api/tokens');
+      const body = (await r.json()) as {
+        tokens?: ApiTokenListRow[];
+        scopes?: string[];
+        error?: string;
+      };
+      if (!r.ok) throw new Error(body.error || 'Could not load API access.');
+      setState({ tokens: body.tokens || [], scopes: body.scopes || [] });
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load API access.');
+    }
+  };
+  const mint = async () => {
+    if (!name.trim() || !chosen.length || minting) return;
+    setMinting(true);
+    setError('');
+    try {
+      const r = await fetch('/api/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), scopes: chosen.join(',') }),
+      });
+      const body = (await r.json()) as { secret?: string; error?: string };
+      if (!r.ok || !body.secret)
+        throw new Error(body.error || 'Minting failed.');
+      setMinted({ name: name.trim(), secret: body.secret });
+      setName('');
+      setChosen([]);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Minting failed.');
+    } finally {
+      setMinting(false);
+    }
+  };
+  const revoke = async (id: string) => {
+    setError('');
+    try {
+      const r = await fetch('/api/tokens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke', id }),
+      });
+      if (!r.ok)
+        throw new Error(
+          ((await r.json()) as { error?: string }).error || 'Revoke failed.',
+        );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Revoke failed.');
+    }
+  };
+  return (
+    <section className="surface token-panel">
+      <p className="eyebrow">API ACCESS</p>
+      <h2>Workspace tokens</h2>
+      <p className="muted">
+        Tokens let outside tools speak this workspace&rsquo;s commands —
+        scoped, revocable, and stamped into history as api:&lt;name&gt;.
+        Reads need the read scope; destructive commands additionally need
+        destructive. The command map lives at /api/commands.
+      </p>
+      {!state && (
+        <Button type="button" onClick={() => void load()}>
+          Manage API access
+        </Button>
+      )}
+      {error && <p className="token-error">{error}</p>}
+      {minted && (
+        <div className="token-minted">
+          <strong>{minted.name}</strong>
+          <code>{minted.secret}</code>
+          <div className="token-minted-actions">
+            <Button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(minted.secret)}
+            >
+              Copy
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setMinted(null)}
+            >
+              I stored it
+            </Button>
+          </div>
+          <small>
+            This is the only time the token is shown. Studio keeps a hash.
+          </small>
+        </div>
+      )}
+      {state && state.tokens.length > 0 && (
+        <ul className="token-list">
+          {state.tokens.map((t) => (
+            <li key={t.id}>
+              <div>
+                <strong>{t.name}</strong>
+                <code>{t.prefix}…</code>
+                <span className="muted">{t.scopes}</span>
+              </div>
+              <div className="token-row-meta">
+                <span className="muted">
+                  {t.lastUsedAt
+                    ? 'last used ' + t.lastUsedAt.slice(0, 10)
+                    : 'never used'}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => void revoke(t.id)}
+                >
+                  Revoke
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {state && (
+        <div className="token-mint">
+          <Input
+            value={name}
+            maxLength={60}
+            placeholder="Token name — e.g. Viktor"
+            onChange={(e) => setName(e.target.value)}
+          />
+          <div className="token-scopes">
+            {state.scopes.map((scope) => (
+              <label key={scope}>
+                <input
+                  type="checkbox"
+                  checked={chosen.includes(scope)}
+                  onChange={(e) =>
+                    setChosen((previous) =>
+                      e.target.checked
+                        ? [...previous, scope]
+                        : previous.filter((s) => s !== scope),
+                    )
+                  }
+                />
+                {scope}
+              </label>
+            ))}
+          </div>
+          <Button
+            type="button"
+            disabled={minting || !name.trim() || !chosen.length}
+            onClick={() => void mint()}
+          >
+            {minting ? 'Minting…' : 'Mint token'}
+          </Button>
+        </div>
+      )}
+    </section>
   );
 }
 export function ResourceCommands({ done }: { done: () => void }) {
