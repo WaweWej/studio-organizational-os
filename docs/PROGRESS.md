@@ -382,3 +382,14 @@ shares the Calendar/Drive OAuth app, so one Google setup serves both. The
 Cloudflare Access path remains supported as an alternative. Migration 0021;
 tests/login-auth.mjs covers sessions, state, allowlists, both provider
 exchanges, and the refusals.
+
+## Deploys no longer erase dashboard settings · 12 September 2026
+
+Every CI deploy was replacing the worker's variables with the artifact's
+empty set, silently deleting whatever the owner had entered in the Cloudflare
+dashboard minutes earlier — secrets survived, plain variables did not, which
+made the Google setup appear to break repeatedly for changing reasons. The
+deploy now passes --keep-vars, so dashboard-set variables and secrets persist
+across every push. Found through the new connection self-examination, whose
+report showed the client ID and redirect URI missing while both secrets
+remained.

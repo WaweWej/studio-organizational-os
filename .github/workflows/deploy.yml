@@ -55,4 +55,7 @@ jobs:
         run: npx wrangler d1 migrations apply studio-d1 --remote --config dist/server/wrangler.json
 
       - name: Deploy
-        run: npx wrangler deploy --config dist/server/wrangler.json
+        # --keep-vars preserves variables and secrets set in the Cloudflare
+        # dashboard; without it every deploy replaces them with the config's
+        # (empty) set and silently erases the owner's settings.
+        run: npx wrangler deploy --keep-vars --config dist/server/wrangler.json
