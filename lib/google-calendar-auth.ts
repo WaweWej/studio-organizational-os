@@ -36,7 +36,19 @@ export async function digest(value: string) {
     (b) => b.toString(16).padStart(2, '0'),
   ).join('');
 }
-export function googleConfigured(config: GoogleConfig) {
+// Settings arrive from dashboard paste buffers; stray whitespace must never
+// change behavior between our validation and the provider's.
+export function cleanGoogleConfig(config: GoogleConfig): GoogleConfig {
+  return {
+    ...config,
+    GOOGLE_CLIENT_ID: config.GOOGLE_CLIENT_ID?.trim(),
+    GOOGLE_CLIENT_SECRET: config.GOOGLE_CLIENT_SECRET?.trim(),
+    GOOGLE_TOKEN_KEY: config.GOOGLE_TOKEN_KEY?.trim(),
+    GOOGLE_REDIRECT_URI: config.GOOGLE_REDIRECT_URI?.trim(),
+  };
+}
+export function googleConfigured(rawConfig: GoogleConfig) {
+  const config = cleanGoogleConfig(rawConfig);
   try {
     return !!(
       config.GOOGLE_CLIENT_ID?.endsWith('.apps.googleusercontent.com') &&
@@ -222,10 +234,11 @@ const tokenRequest = (
   );
 export async function startGoogle(
   c: Context,
-  config: GoogleConfig,
+  rawConfig: GoogleConfig,
   browserSecret: string,
   withDrive = false,
 ) {
+  const config = cleanGoogleConfig(rawConfig);
   requireGoogleConfig(config);
   const state = randomSecret(),
     verifier = randomSecret();
@@ -273,12 +286,13 @@ export async function startGoogle(
 }
 export async function finishGoogle(
   c: Context,
-  config: GoogleConfig,
+  rawConfig: GoogleConfig,
   state: string,
   browserSecret: string,
   code: string,
   fetcher: typeof fetch = fetch,
 ) {
+  const config = cleanGoogleConfig(rawConfig);
   requireGoogleConfig(config);
   if (
     !state ||
@@ -357,10 +371,11 @@ export async function finishGoogle(
 }
 export async function accessToken(
   c: Context,
-  config: GoogleConfig,
+  rawConfig: GoogleConfig,
   connection: GoogleConnection,
   fetcher: typeof fetch = fetch,
 ) {
+  const config = cleanGoogleConfig(rawConfig);
   requireGoogleConfig(config);
   try {
     const tokens = await tokenRequest(

@@ -22,7 +22,16 @@ type LoginConfig = {
   STUDIO_ALLOWED_EMAILS?: string;
 };
 
-const config = () => env as LoginConfig;
+const config = () => {
+  const raw = env as LoginConfig;
+  return {
+    ...raw,
+    STUDIO_GITHUB_CLIENT_ID: raw.STUDIO_GITHUB_CLIENT_ID?.trim(),
+    STUDIO_GITHUB_CLIENT_SECRET: raw.STUDIO_GITHUB_CLIENT_SECRET?.trim(),
+    GOOGLE_CLIENT_ID: raw.GOOGLE_CLIENT_ID?.trim(),
+    GOOGLE_CLIENT_SECRET: raw.GOOGLE_CLIENT_SECRET?.trim(),
+  };
+};
 const list = (value?: string) =>
   (value || '')
     .split(',')
