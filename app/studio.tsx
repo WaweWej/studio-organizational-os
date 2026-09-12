@@ -749,6 +749,13 @@ export default function Studio() {
             {page === 'desk' && ready && (
               <WorkingDesk
                 openMeeting={id=>setMeetingTarget({meetingId:id})}
+                onNavigate={(intent) => {
+                  if (intent.type === 'open-view') navigate(intent.view);
+                  else if (intent.type === 'open-space')
+                    space(intent.spaceId);
+                  else if (intent.type === 'open-project')
+                    project(intent.projectId);
+                }}
                 key={data.draftScope || "loading"}
                 data={data}
                 ready={ready}

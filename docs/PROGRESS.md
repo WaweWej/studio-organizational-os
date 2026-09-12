@@ -422,3 +422,16 @@ catalog (lib/command-catalog.ts, forty commands with groups, risk classes,
 and field shapes) served to signed-in callers at /api/commands, held against
 the boundary's real dispatch strings by tests/command-catalog.mjs so the map
 cannot drift from the territory.
+
+## Navigation from the Desk · 12 September 2026
+
+The Desk now jumps: "open calendar" (and every view by name or alias —
+today, boards, clients, pipeline, projects, library, systems…), "open
+<client>" straight to the client's page, "open <project>" to the project,
+resolved by the same deterministic rules as the log intents, with the fixed
+view vocabulary always winning over a client that shares a name and
+ambiguity still refusing. Navigation intents exist only where the host can
+navigate — the shell answers them with its own navigate/space/project
+functions — so composers embedded elsewhere are unaffected, and the same
+phrases fall through to notes there. The log form keeps precedence: "open
+Rørvig Teater log" opens the log, "open Rørvig Teater" opens the client.

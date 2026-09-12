@@ -51,4 +51,38 @@ assert.equal(inferEntryKind('add task send the invoice'), 'task');
 assert.equal(inferEntryKind('task: send the invoice'), 'task');
 assert.equal(inferEntryKind('new task edit the video'), 'task');
 
+// Navigation intents exist only where the host can navigate.
+const nav = { navigation: true };
+const withProjects = { ...data, projects: [
+  { id: 'p1', name: 'Autumn campaign' },
+  { id: 'p2', name: 'Website relaunch' },
+] };
+
+// Views by name and alias; the fixed vocabulary always wins over clients.
+assert.equal(parseSurfaceIntent('open calendar', data, nav)?.view, 'calendar');
+assert.equal(parseSurfaceIntent('go to library', data, nav)?.view, 'library');
+assert.equal(parseSurfaceIntent('show pipeline', data, nav)?.view, 'sales');
+assert.equal(parseSurfaceIntent('open today', data, nav)?.view, 'day');
+assert.equal(parseSurfaceIntent('open systems', data, nav)?.view, 'blueprints');
+const viewNamedClient = { spaces: [...data.spaces, { id: 's5', name: 'Calendar' }] };
+assert.equal(parseSurfaceIntent('open calendar', viewNamedClient, nav)?.type, 'open-view');
+
+// Clients and projects resolve by the same deterministic rules.
+const sp = parseSurfaceIntent('open Rørvig Teater', data, nav);
+assert.equal(sp?.type, 'open-space');
+assert.equal(sp?.spaceId, 's1');
+assert.equal(parseSurfaceIntent('open Betterlytics', data, nav)?.spaceId, 's2');
+assert.equal(parseSurfaceIntent('open Better', data, nav), null);
+const pr = parseSurfaceIntent('open Autumn campaign', withProjects, nav);
+assert.equal(pr?.type, 'open-project');
+assert.equal(pr?.projectId, 'p1');
+assert.equal(parseSurfaceIntent('open Website', withProjects, nav)?.projectId, 'p2');
+
+// The log form still wins over plain navigation for the same client.
+assert.equal(parseSurfaceIntent('open Rørvig Teater log', data, nav)?.type, 'client-log');
+
+// Without a navigating host, navigation phrases fall through to notes.
+assert.equal(parseSurfaceIntent('open calendar', data), null);
+assert.equal(inferEntryKind('open calendar'), 'note');
+
 console.log('PASS: surface intents — log phrases resolve clients by exact, prefix, and word match with deterministic ambiguity refusal, seeds carry through, and only explicit task phrasing creates tasks.');

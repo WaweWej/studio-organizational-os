@@ -1,6 +1,9 @@
 'use client';
 import { DraftCache } from '@/lib/draft-cache';
-import { parseSurfaceIntent } from '@/lib/desk-surfaces';
+import {
+  parseSurfaceIntent,
+  type SurfaceIntent,
+} from '@/lib/desk-surfaces';
 import {
   Dialog,
   DialogContent,
@@ -107,6 +110,7 @@ export default function QuickCapture({
   variant = 'standard',
   focusTaskId,
   onDraftChange,
+  onNavigate,
 }: {
   data: Workspace;
   ready: boolean;
@@ -124,6 +128,7 @@ export default function QuickCapture({
   variant?: 'standard' | 'desk';
   focusTaskId?: string | null;
   onDraftChange?: (text: string) => void;
+  onNavigate?: (intent: SurfaceIntent) => void;
 }) {
   const draftKey = draftId || projectId || 'workspace',
     initial = drafts.get(draftKey);
@@ -183,8 +188,11 @@ export default function QuickCapture({
     actionMenuOpen = slash !== null;
   const actions = actionMenuOpen ? commandSuggestions(slash) : [];
   // A surface intent opens a place instead of creating an entry.
+  // Navigation intents only exist where the host can navigate.
   const surface =
-    !actionMenuOpen && kind === 'auto' ? parseSurfaceIntent(text, data) : null;
+    !actionMenuOpen && kind === 'auto'
+      ? parseSurfaceIntent(text, data, { navigation: !!onNavigate })
+      : null;
   const [logPanel, setLogPanel] = useState<{
     spaceId: string;
     spaceName: string;
@@ -414,11 +422,13 @@ export default function QuickCapture({
     }
     setAttempted(true);
     if (surface) {
-      setLogPanel({
-        spaceId: surface.spaceId,
-        spaceName: surface.spaceName,
-        body: surface.seed,
-      });
+      if (surface.type === 'client-log')
+        setLogPanel({
+          spaceId: surface.spaceId,
+          spaceName: surface.spaceName,
+          body: surface.seed,
+        });
+      else onNavigate?.(surface);
       setText('');
       setPins([]);
       setCaret(0);
@@ -873,11 +883,21 @@ export default function QuickCapture({
         <div className="entry-routing">
           <div className="entry-route-copy">
             <span>Opens</span>
-            <strong>{surface.spaceName} — log</strong>
-            <small className="capture-impact">
-              Write the entry there; it is stored on the client&rsquo;s
-              timeline.
-            </small>
+            <strong>
+              {surface.type === 'client-log'
+                ? surface.spaceName + ' — log'
+                : surface.type === 'open-view'
+                  ? surface.label
+                  : surface.type === 'open-space'
+                    ? surface.spaceName
+                    : surface.projectName}
+            </strong>
+            {surface.type === 'client-log' && (
+              <small className="capture-impact">
+                Write the entry there; it is stored on the client&rsquo;s
+                timeline.
+              </small>
+            )}
           </div>
         </div>
       )}

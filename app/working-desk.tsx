@@ -17,6 +17,7 @@ import {
   Layers,
 } from 'lucide-react';
 import QuickCapture, { type CaptureDraft } from './quick-capture';
+import type { SurfaceIntent } from '@/lib/desk-surfaces';
 import type { Workspace } from '@/lib/model';
 import {
   captureDestination,
@@ -68,6 +69,7 @@ export default function WorkingDesk({
   setFocusTask,
   openTask,
   openMeeting,
+  onNavigate,
 }: {
   data: Workspace;
   ready: boolean;
@@ -81,6 +83,7 @@ export default function WorkingDesk({
   setFocusTask: (id: string | null) => void;
   openTask: (id: string) => void;
   openMeeting: (id: string) => void;
+  onNavigate?: (intent: SurfaceIntent) => void;
 }) {
   const now = useWorkspaceClock(),
     field = useRef<HTMLDivElement>(null);
@@ -190,6 +193,7 @@ export default function WorkingDesk({
         <QuickCapture
           key={planComposer ? 'daily-planning' : 'workspace'}
           draftId={planComposer ? 'daily-planning' : 'workspace'}
+          onNavigate={onNavigate}
           variant="desk"
           focusTaskId={task?.id}
           onDraftChange={setDraftText}
