@@ -107,7 +107,8 @@ export async function googleConnection(c: Context) {
 }
 export class GoogleError extends AppError {
   googleStatus: number;
-  constructor(googleStatus: number) {
+  oauthCode?: string;
+  constructor(googleStatus: number, oauthCode?: string) {
     super(
       googleStatus === 401
         ? 'Google access expired. Reconnect Google Calendar.'
@@ -115,16 +116,25 @@ export class GoogleError extends AppError {
           ? 'Google refused access. Check Calendar API access and the permissions you approved.'
           : googleStatus === 429
             ? 'Google is busy. Try syncing again shortly.'
-            : 'Google Calendar could not be reached. Your Studio work is saved; try syncing again.',
+            : oauthCode === 'invalid_client'
+              ? 'Google rejected this app\u2019s credentials (invalid_client). Check GOOGLE_CLIENT_ID and re-enter GOOGLE_CLIENT_SECRET.'
+              : oauthCode === 'redirect_uri_mismatch'
+                ? 'Google rejected the redirect address (redirect_uri_mismatch). GOOGLE_REDIRECT_URI must exactly match an authorized redirect URI in Google Cloud.'
+                : oauthCode === 'invalid_grant'
+                  ? 'The Google sign-in code expired or was already used (invalid_grant). Start the connection again.'
+                  : oauthCode
+                    ? `Google refused the connection (${oauthCode}).`
+                    : 'Google Calendar could not be reached. Your Studio work is saved; try syncing again.',
       502,
     );
     this.googleStatus = googleStatus;
+    this.oauthCode = oauthCode;
   }
 }
 // Fixed origins, no redirects, bounded responses, and no provider response bodies in errors/logs.
 export async function googleRequest<T>(
   url: string,
-  init: RequestInit = {},
+  init: RequestInit & { oauthErrorCode?: boolean } = {},
   fetcher: typeof fetch = fetch,
 ): Promise<T> {
   const parsed = new URL(url);
@@ -133,10 +143,11 @@ export async function googleRequest<T>(
     !['oauth2.googleapis.com', 'www.googleapis.com'].includes(parsed.hostname)
   )
     throw new AppError('Invalid Google endpoint.');
+  const { oauthErrorCode, ...requestInit } = init;
   let response: Response;
   try {
     response = await fetcher(url, {
-      ...init,
+      ...requestInit,
       redirect: 'error',
       signal: AbortSignal.timeout(15000),
     });
@@ -144,7 +155,19 @@ export async function googleRequest<T>(
     throw new GoogleError(0);
   }
   if (!response.ok) {
-    await response.body?.cancel();
+    if (oauthErrorCode) {
+      // The OAuth token endpoint's error code (invalid_client,
+      // redirect_uri_mismatch, ...) is a short fixed identifier, not
+      // provider payload; surfacing it makes configuration mistakes
+      // answerable. Anything unexpected is discarded as before.
+      try {
+        const body = (await response.json()) as { error?: string };
+        if (typeof body.error === 'string' && /^[a-z_]{1,40}$/.test(body.error))
+          throw new GoogleError(response.status, body.error);
+      } catch (e) {
+        if (e instanceof GoogleError) throw e;
+      }
+    } else await response.body?.cancel();
     throw new GoogleError(response.status);
   }
   if (response.status === 204) return undefined as T;
@@ -187,6 +210,7 @@ const tokenRequest = (
     'https://oauth2.googleapis.com/token',
     {
       method: 'POST',
+      oauthErrorCode: true,
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: config.GOOGLE_CLIENT_ID!,
