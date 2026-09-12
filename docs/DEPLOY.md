@@ -101,8 +101,10 @@ request URL pointed at `https://studio.<your-subdomain>.workers.dev/api/slack`.
 
 ## Day to day
 
-Pushes to the default branch deploy automatically. Data lives in the
-`studio-d1` database (export a backup any time with
-`npx wrangler d1 export studio-d1 --remote --output backup.sql`) and files in
-the `studio-r2` bucket. The ChatGPT Sites deployment is unaffected and can
+Pushes to the default branch deploy automatically, preserving every variable
+and secret set in the dashboard. Data lives in the `studio-d1` database, and
+a nightly workflow exports it as a downloadable backup kept for 90 days
+(repository → Actions → Backup database → the run's artifact); keep the
+repository private so backups stay private. A manual export any time:
+`npx wrangler d1 export studio-d1 --remote --output backup.sql`. The ChatGPT Sites deployment is unaffected and can
 run in parallel; the two share code, never data.
