@@ -13,6 +13,16 @@ const prefix = (value: string) =>
 const create = '(?:add|create|start)\\s+(?:a\\s+)?(?:new\\s+)?';
 export const deskIntents: DeskIntent[] = [
   {
+    id: 'client',
+    kind: 'note',
+    title: 'New client',
+    insert: 'add client ',
+    example: 'add client Nordkyst Retreat — creates and opens the client',
+    aliases: ['client', 'new client', 'add client', 'create client'],
+    // Selection inserts the phrase; the surface grammar takes it from there.
+    pattern: /^(?!)$/,
+  },
+  {
     id: 'day',
     kind: 'daily',
     title: 'Plan my day',

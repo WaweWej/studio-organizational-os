@@ -470,3 +470,16 @@ navigation, and the only-explicit-task law are all unaffected, and
 docs/CHANGES-2026-09.md: automations are to become visual, linked flows on
 the Processes page with near-real-time run monitoring that the API layer —
 Viktor — can both read and update.
+
+## The slash instinct is honored · 13 September 2026
+
+The owner typed "/add new client" and got a note: the slash menu closes the
+moment a space is typed, and the surface grammar did not expect the slash.
+Now a leading slash on any full sentence signals command intent and is
+honored — "/add new client", "/open calendar", "/add to <client> log" all
+route as their slashless forms — and the slash menu itself gained a New
+client action that inserts the creation phrase, so both the menu path and
+the sentence path arrive at the same place. The desk suite's stateful half
+currently fails on pristine code against a drifted local database (same
+class as the known fixture debt); its deterministic interpreter half, which
+guards this grammar, passes.

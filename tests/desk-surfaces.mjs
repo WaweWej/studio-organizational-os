@@ -101,4 +101,10 @@ assert.equal(cc('open clients')?.type, 'open-view');
 assert.equal(parseSurfaceIntent('add clients meeting notes', data, nav), null);
 assert.equal(inferEntryKind('add task call the new client'), 'task');
 
+// A leading slash signals command intent and is honored, not noted.
+assert.equal(cc('/add new client')?.type, 'create-client');
+assert.equal(cc('/add client Fjordlys')?.name, 'Fjordlys');
+assert.equal(cc('/open calendar')?.view, 'calendar');
+assert.equal(cc('/add to Rørvig Teater log')?.type, 'client-log');
+
 console.log('PASS: surface intents — log phrases resolve clients by exact, prefix, and word match with deterministic ambiguity refusal, seeds carry through, and only explicit task phrasing creates tasks.');

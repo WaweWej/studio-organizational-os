@@ -81,12 +81,15 @@ function resolveProjectByName(
 }
 
 export function parseSurfaceIntent(
-  text: string,
+  rawText: string,
   data: Pick<Workspace, 'spaces'> & {
     projects?: { id: string; name: string }[];
   },
   options: { navigation?: boolean } = {},
 ): SurfaceIntent | null {
+  // A leading slash signals command intent; the grammar honors it rather
+  // than letting the sentence fall through to a note.
+  const text = rawText.replace(/^\s*\/\s*/, '');
   const verb = LOG_WITH_VERB.exec(text);
   const bare = verb ? null : LOG_BARE.exec(text);
   const match = verb || bare;
