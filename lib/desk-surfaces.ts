@@ -13,7 +13,8 @@ export type SurfaceIntent =
     }
   | { type: 'open-view'; view: string; label: string }
   | { type: 'open-space'; spaceId: string; spaceName: string }
-  | { type: 'open-project'; projectId: string; projectName: string };
+  | { type: 'open-project'; projectId: string; projectName: string }
+  | { type: 'create-client'; name: string };
 
 // Fixed view vocabulary; a view name always wins over a client that happens
 // to share it, because the vocabulary is checked first and never ambiguous.
@@ -60,6 +61,8 @@ export function resolveSpaceByName(
 }
 
 const OPEN = /^\s*(?:open|go to|show)\s+(.+?)\s*$/i;
+const CREATE_CLIENT =
+  /^\s*(?:add|create|new)\s+(?:a\s+)?(?:new\s+)?client\b\s*:?\s*(.*)$/i;
 
 function resolveProjectByName(
   data: { projects?: { id: string; name: string }[] },
@@ -98,6 +101,8 @@ export function parseSurfaceIntent(
       };
     if (verb) return null;
   }
+  const create = CREATE_CLIENT.exec(text);
+  if (create) return { type: 'create-client', name: create[1].trim() };
   if (!options.navigation) return null;
   const open = OPEN.exec(text);
   if (!open) return null;

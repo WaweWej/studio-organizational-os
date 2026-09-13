@@ -88,3 +88,11 @@ speaker of the existing validated command boundary (never direct database
 access), bring-your-own provider keys sealed like Google tokens, proposal
 cards with explicit approval before any write. Nothing of it is built yet;
 when building it, keep the Desk's deterministic interpreter untouched.
+
+Owner's direction note (12 September 2026): automations belong on the
+Processes page as something visual — flows with links between steps — with
+as close to real-time monitoring of runs as the platform allows, and the
+API/assistant layer (Viktor in particular) must be able both to read that
+monitoring and to update the flows through the command boundary. The
+current Processes page's "visual editor and live monitoring are still
+planned" copy is the placeholder for exactly this.

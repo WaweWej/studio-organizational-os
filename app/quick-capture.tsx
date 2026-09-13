@@ -200,6 +200,28 @@ export default function QuickCapture({
   } | null>(null);
   const [logSaving, setLogSaving] = useState(false);
   const logRequest = useRef<{ fingerprint: string; id: string } | null>(null);
+  const [clientPanel, setClientPanel] = useState<{ name: string } | null>(
+    null,
+  );
+  const [clientSaving, setClientSaving] = useState(false);
+  const clientRequest = useRef<{ name: string; id: string } | null>(null);
+  const createClient = async (rawName: string) => {
+    const name = rawName.trim();
+    if (!name || clientSaving || busy || !ready) return;
+    if (clientRequest.current?.name !== name)
+      clientRequest.current = { name, id: crypto.randomUUID() };
+    const { id } = clientRequest.current;
+    setClientSaving(true);
+    try {
+      if (await act({ type: 'client-create', id, name })) {
+        clientRequest.current = null;
+        setClientPanel(null);
+        onNavigate?.({ type: 'open-space', spaceId: id, spaceName: name });
+      }
+    } finally {
+      setClientSaving(false);
+    }
+  };
   const saveLog = async () => {
     if (!logPanel || !logPanel.body.trim() || logSaving || busy || !ready)
       return;
@@ -428,7 +450,10 @@ export default function QuickCapture({
           spaceName: surface.spaceName,
           body: surface.seed,
         });
-      else onNavigate?.(surface);
+      else if (surface.type === 'create-client') {
+        if (surface.name) void createClient(surface.name);
+        else setClientPanel({ name: '' });
+      } else onNavigate?.(surface);
       setText('');
       setPins([]);
       setCaret(0);
@@ -882,7 +907,7 @@ export default function QuickCapture({
       {surface && text.trim() && !actionMenuOpen && (
         <div className="entry-routing">
           <div className="entry-route-copy">
-            <span>Opens</span>
+            <span>{surface.type === 'create-client' ? 'Creates' : 'Opens'}</span>
             <strong>
               {surface.type === 'client-log'
                 ? surface.spaceName + ' — log'
@@ -890,7 +915,11 @@ export default function QuickCapture({
                   ? surface.label
                   : surface.type === 'open-space'
                     ? surface.spaceName
-                    : surface.projectName}
+                    : surface.type === 'open-project'
+                      ? surface.projectName
+                      : surface.name
+                        ? 'new client ' + surface.name
+                        : 'new client'}
             </strong>
             {surface.type === 'client-log' && (
               <small className="capture-impact">
@@ -1169,7 +1198,9 @@ export default function QuickCapture({
               <ArrowUp size={17} />
             ))}
           {surface
-            ? 'Open log'
+            ? surface.type === 'create-client'
+              ? 'Create client'
+              : 'Open'
             : variant === 'desk'
             ? saving
               ? 'Saving…'
@@ -1209,6 +1240,55 @@ export default function QuickCapture({
           </button>
         </output>
       )}
+      <Dialog
+        open={!!clientPanel}
+        onOpenChange={(value) => {
+          if (!value && !clientSaving) setClientPanel(null);
+        }}
+      >
+        <DialogContent className="fc-dialog log-panel-dialog">
+          <DialogHeader>
+            <DialogTitle>New client</DialogTitle>
+            <DialogDescription>
+              Created as a client space; you land on it right after.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            ref={(node: HTMLInputElement | null) => node?.focus()}
+            value={clientPanel?.name || ''}
+            maxLength={120}
+            placeholder="Client name"
+            onChange={(e) =>
+              setClientPanel(
+                (previous) => previous && { ...previous, name: e.target.value },
+              )
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void createClient(clientPanel?.name || '');
+              }
+            }}
+          />
+          <footer className="log-panel-actions">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={clientSaving}
+              onClick={() => setClientPanel(null)}
+            >
+              Discard
+            </Button>
+            <Button
+              type="button"
+              disabled={clientSaving || !clientPanel?.name.trim() || busy || !ready}
+              onClick={() => void createClient(clientPanel?.name || '')}
+            >
+              {clientSaving ? 'Creating…' : 'Create client'}
+            </Button>
+          </footer>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={!!logPanel}
         onOpenChange={(value) => {

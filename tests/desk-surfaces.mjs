@@ -85,4 +85,20 @@ assert.equal(parseSurfaceIntent('open Rørvig Teater log', data, nav)?.type, 'cl
 assert.equal(parseSurfaceIntent('open calendar', data), null);
 assert.equal(inferEntryKind('open calendar'), 'note');
 
+// Client creation from the Desk — the owner's exact phrases.
+const cc = (t) => parseSurfaceIntent(t, data, nav);
+assert.equal(cc('Add new client')?.type, 'create-client');
+assert.equal(cc('Add new client')?.name, '');
+assert.equal(cc('Create new client')?.type, 'create-client');
+assert.equal(cc('add client Nordkyst Retreat')?.name, 'Nordkyst Retreat');
+assert.equal(cc('create client: Nordkyst')?.name, 'Nordkyst');
+assert.equal(cc('new client Fjordlys')?.name, 'Fjordlys');
+// Creation works even without a navigating host.
+assert.equal(parseSurfaceIntent('add client Fjordlys', data)?.type, 'create-client');
+// Precedence and neighbors unharmed.
+assert.equal(cc('add to Rørvig Teater log')?.type, 'client-log');
+assert.equal(cc('open clients')?.type, 'open-view');
+assert.equal(parseSurfaceIntent('add clients meeting notes', data, nav), null);
+assert.equal(inferEntryKind('add task call the new client'), 'task');
+
 console.log('PASS: surface intents — log phrases resolve clients by exact, prefix, and word match with deterministic ambiguity refusal, seeds carry through, and only explicit task phrasing creates tasks.');

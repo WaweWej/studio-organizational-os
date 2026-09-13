@@ -454,3 +454,19 @@ actor api:Viktor, hit the scope wall with a truthful refusal, revoke.
 docs/API.md is the external caller's guide. Migration 0022;
 tests/api-tokens.mjs covers hashing, resolution, the gate, and the
 refusals.
+
+## The Desk creates clients · 12 September 2026
+
+"Add new client" did nothing a person could see — the phrase named a
+command the boundary has had for weeks, and the Desk simply couldn't say
+it. Now it can: "add client <name>" / "create client <name>" /
+"new client <name>" creates the client immediately (idempotent
+client-supplied id, the same client-create command the Spaces dialog uses)
+and lands on its page; the bare forms — "Add new client",
+"Create new client" — open a small name panel first. Name collisions keep
+the boundary's truthful 409. Grammar precedence holds: log phrases,
+navigation, and the only-explicit-task law are all unaffected, and
+"open clients" still navigates. Also recorded the owner's direction note in
+docs/CHANGES-2026-09.md: automations are to become visual, linked flows on
+the Processes page with near-real-time run monitoring that the API layer —
+Viktor — can both read and update.
