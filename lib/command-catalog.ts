@@ -337,6 +337,26 @@ export const commandCatalog: CommandDescriptor[] = [
     fields: [id('id')],
   },
   {
+    name: 'member-invite',
+    group: 'access',
+    summary:
+      'Invite an email address to join this workspace as a member. Session identities only — tokens cannot manage access.',
+    risk: 'write',
+    fields: [
+      id('id', 'Client-supplied UUID.'),
+      text('email', true, 'Lowercased; must also be allowlisted for sign-in.'),
+      text('name'),
+    ],
+  },
+  {
+    name: 'member-revoke',
+    group: 'access',
+    summary:
+      "Revoke a member's or invite's workspace access. Session identities only.",
+    risk: 'destructive',
+    fields: [id('id')],
+  },
+  {
     name: 'token-create',
     group: 'access',
     summary:

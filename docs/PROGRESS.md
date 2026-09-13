@@ -483,3 +483,20 @@ the sentence path arrive at the same place. The desk suite's stateful half
 currently fails on pristine code against a drifted local database (same
 class as the known fixture debt); its deterministic interpreter half, which
 guards this grammar, passes.
+
+## The workspace opens: membership · 13 September 2026
+
+Roadmap item 1, first slice. Until now every signed-in identity received
+its own isolated org; a teammate signing in landed in an empty parallel
+Studio. Now the workspace has membership: an invite is a row holding an
+email; the first allowlisted sign-in with that verified email claims it
+and lands in the inviting org as a named member — actor stamps, the
+people list, and assignment all referring to the person by name. Managed
+from Systems → Team through two new boundary commands (member-invite,
+member-revoke; 44 in the catalog), session identities only — tokens
+cannot manage access, members cannot revoke themselves, and revocation is
+immediate, returning the person to their own workspace while their
+history stays. Identity resolution: accepted membership wins, then a
+claimable invite, then the identity's own org exactly as before, so the
+owner's workspace and every existing stamp are untouched. Covered by a
+dedicated suite over the real migration set.

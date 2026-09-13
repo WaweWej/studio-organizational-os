@@ -1,3 +1,4 @@
+import { resolveMembership } from './workspace-members';
 import { changeDayWork } from './day-work-store';
 import { googleStatus } from './google-calendar-sync';
 import { driveStatus } from './google-drive';
@@ -144,12 +145,25 @@ export async function context(): Promise<Context> {
   if (!user) throw new AppError('Sign in to access your workspace.', 401);
   if (!env.DB)
     throw new AppError('The workspace database is unavailable.', 503);
-  const c = {
-    org: user.userId,
-    actor: 'me',
-    name: user.fullName || user.displayName.split('@')[0],
-    db: env.DB,
-  };
+  // An accepted or claimable membership routes this identity into the
+  // inviting org as a named member; otherwise the identity keeps its own
+  // org, exactly as before.
+  const membership = await resolveMembership(
+    { db: env.DB },
+    {
+      userId: user.userId,
+      email: user.email || '',
+      displayName: user.fullName || user.displayName.split('@')[0],
+    },
+  ).catch(() => null);
+  const c = membership
+    ? { ...membership, db: env.DB }
+    : {
+        org: user.userId,
+        actor: 'me',
+        name: user.fullName || user.displayName.split('@')[0],
+        db: env.DB,
+      };
   await seed(c);
   await upgradeResources(c);
   try {
@@ -318,6 +332,12 @@ export async function mutate(
     const { createToken, revokeToken } = await import('./api-tokens');
     if (type === 'token-create') await createToken(c, input);
     else await revokeToken(c, input);
+    return;
+  }
+  if (type === 'member-invite' || type === 'member-revoke') {
+    const { inviteMember, revokeMember } = await import('./workspace-members');
+    if (type === 'member-invite') await inviteMember(c, input);
+    else await revokeMember(c, input);
     return;
   }
   if (type === 'day-work') { await changeDayWork(c,input); return; }

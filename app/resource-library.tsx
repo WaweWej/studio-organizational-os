@@ -1434,6 +1434,7 @@ export function BlueprintRegistry() {
         </DialogContent>
       </Dialog>
       <ApiAccessPanel />
+      <TeamPanel />
     </>
   );
 }
@@ -1849,5 +1850,142 @@ function DriveAttach({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// The team: workspace members and open invites. Invited email addresses
+// join this workspace on their first allowlisted sign-in; revocation is
+// immediate and returns the person to their own workspace.
+type TeamRow = {
+  id: string;
+  email: string;
+  memberId: string;
+  displayName: string;
+  status: 'invited' | 'member';
+  createdAt: string;
+  acceptedAt: string;
+};
+
+function TeamPanel() {
+  const [rows, setRows] = useState<TeamRow[] | null>(null);
+  const [error, setError] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    try {
+      const r = await fetch('/api/team');
+      const body = (await r.json()) as { members?: TeamRow[]; error?: string };
+      if (!r.ok || !body.members) throw new Error(body.error || 'Failed.');
+      setRows(body.members);
+      setError('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load the team.');
+    }
+  };
+  const command = async (payload: Record<string, unknown>) => {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const body = (await r.json()) as { error?: string };
+        throw new Error(body.error || 'The command was refused.');
+      }
+      setError('');
+      await load();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The command failed.');
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="token-panel">
+      <header>
+        <h2>Team</h2>
+        <p className="muted">
+          Invited addresses join this workspace on their first sign-in. They
+          must also be allowlisted for sign-in itself.
+        </p>
+      </header>
+      {!rows ? (
+        <Button type="button" onClick={() => void load()}>
+          Manage team
+        </Button>
+      ) : (
+        <>
+          {rows.length > 0 && (
+            <ul className="token-list">
+              {rows.map((row) => (
+                <li key={row.id}>
+                  <div>
+                    <strong>{row.displayName}</strong>
+                    <small className="muted">
+                      {row.email} ·{' '}
+                      {row.status === 'member'
+                        ? 'Member since ' + row.acceptedAt.slice(0, 10)
+                        : 'Invited ' + row.createdAt.slice(0, 10)}
+                    </small>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() =>
+                      void command({ type: 'member-revoke', id: row.id })
+                    }
+                  >
+                    Revoke
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!rows.length && (
+            <p className="muted">No members or invites yet.</p>
+          )}
+          <form
+            className="token-mint"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!name.trim() || !email.trim()) return;
+              void command({
+                type: 'member-invite',
+                id: crypto.randomUUID(),
+                email: email.trim(),
+                name: name.trim(),
+              }).then((ok) => {
+                if (ok) {
+                  setName('');
+                  setEmail('');
+                }
+              });
+            }}
+          >
+            <input
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              placeholder="email@company.dk"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Button type="submit" disabled={busy || !name.trim() || !email.trim()}>
+              Invite
+            </Button>
+          </form>
+        </>
+      )}
+      {error && <p className="token-error">{error}</p>}
+    </section>
   );
 }

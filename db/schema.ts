@@ -611,3 +611,29 @@ export const apiTokens = sqliteTable(
     uniqueIndex('tokens_by_hash').on(t.tokenHash),
   ],
 );
+
+// Workspace membership: who belongs to which org, and as whom. An invite is
+// a row with an email and no identity; the first allowlisted sign-in with
+// that verified email claims it. Identities without a membership get their
+// own org, exactly as before.
+export const workspaceMembers = sqliteTable(
+  'workspaceMembers',
+  {
+    org: text('org').notNull(),
+    id: text('id').notNull(),
+    email: text('email').notNull(),
+    userId: text('userId').notNull().default(''),
+    memberId: text('memberId').notNull(),
+    displayName: text('displayName').notNull(),
+    role: text('role').notNull().default('member'),
+    invitedBy: text('invitedBy').notNull(),
+    createdAt: text('createdAt').notNull(),
+    acceptedAt: text('acceptedAt').notNull().default(''),
+    revokedAt: text('revokedAt').notNull().default(''),
+  },
+  (t) => [
+    primaryKey({ columns: [t.org, t.id] }),
+    index('memberships_by_user').on(t.userId),
+    index('memberships_by_email').on(t.email),
+  ],
+);

@@ -108,3 +108,13 @@ a nightly workflow exports it as a downloadable backup kept for 90 days
 repository private so backups stay private. A manual export any time:
 `npx wrangler d1 export studio-d1 --remote --output backup.sql`. The ChatGPT Sites deployment is unaffected and can
 run in parallel; the two share code, never data.
+
+## Team members
+
+Invite teammates from Systems → Team. Two gates apply, deliberately
+separate: STUDIO_ALLOWED_EMAILS (or the GitHub allowlist) decides who can
+sign in to the deployment at all; the invite decides which workspace they
+land in. An invited address must pass both — add it to the allowlist and
+to the team. Members act under their own name in history, assignment, and
+notices. Revoking a member is immediate and returns them to their own
+empty workspace; nothing they wrote is removed.

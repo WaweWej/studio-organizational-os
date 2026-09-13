@@ -6,7 +6,7 @@ Desk opens it); this file carries the complete reasoning. Per the house
 law, none of these add decorative copy — every item is structure, signal,
 or capability.
 
-## 1. Shared workspace
+## 1. Shared workspace — in progress (membership shipped 13 Sept)
 
 Every signed-in identity currently gets its own isolated org
 (`org = user.userId` in `context()`), so a teammate signing in lands in an
