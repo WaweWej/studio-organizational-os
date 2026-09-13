@@ -5,10 +5,12 @@ import { inferEntryKind, interpretEntry } from '../lib/entry-model.ts';
 const data = initialWorkspace(),
   now = new Date(2026, 8, 9, 12);
 assert.equal(inferEntryKind('The client prefers a quieter opening'), 'note');
-// The owner's law (September 2026): only explicit task phrasing creates
-// tasks; verb-shaped sentences stay as written, as notes.
-assert.equal(inferEntryKind('Edit the launch video'), 'note');
+// The layered law (owner, revised 13 September 2026): explicit words win,
+// then doing-words mean doing; plain statements remain notes.
+assert.equal(inferEntryKind('Edit the launch video'), 'task');
+assert.equal(inferEntryKind('call @client about the launch'), 'task');
 assert.equal(inferEntryKind('add task edit the launch video'), 'task');
+assert.equal(inferEntryKind('add note on @client: prefers mornings'), 'note');
 assert.equal(inferEntryKind('Task: follow up'), 'task');
 assert.equal(
   inferEntryKind('Meeting notes @nord: agreed a new direction'),

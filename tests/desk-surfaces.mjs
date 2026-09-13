@@ -42,14 +42,19 @@ assert.equal(resolveSpaceByName(data, 'betterlytics')?.id, 's2');
 // Unknown names fall through to ordinary interpretation.
 assert.equal(parseSurfaceIntent('add to Nobody log', data), null);
 
-// The law: only explicit task phrasing makes tasks. Verb-shaped sentences
-// are kept as notes, never turned into chores.
+// The layered law: surface intents intercept action phrases before entry
+// classification; explicit words win; then doing-words mean doing. "add"
+// alone is not a doing-word — its phrases route through intents and
+// surfaces, so an unresolved "add to X log" degrades to a note, never a
+// chore about a chore.
 assert.equal(inferEntryKind('add to Rørvig Teater log'), 'note');
-assert.equal(inferEntryKind('book flights for the festival'), 'note');
-assert.equal(inferEntryKind('send the invoice'), 'note');
+assert.equal(inferEntryKind('book flights for the festival'), 'task');
+assert.equal(inferEntryKind('send the invoice'), 'task');
+assert.equal(inferEntryKind('call @rørvig about the premiere'), 'task');
 assert.equal(inferEntryKind('add task send the invoice'), 'task');
 assert.equal(inferEntryKind('task: send the invoice'), 'task');
 assert.equal(inferEntryKind('new task edit the video'), 'task');
+assert.equal(inferEntryKind('add note on @rørvig: seed money secured'), 'note');
 
 // Navigation intents exist only where the host can navigate.
 const nav = { navigation: true };

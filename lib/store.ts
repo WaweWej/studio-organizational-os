@@ -41,6 +41,7 @@ import {
 
 const collections = [
   'dailyPlans',
+  'dailyPlanTasks',
   'calendarEvents',
   'captureEntries',
   'prospects',

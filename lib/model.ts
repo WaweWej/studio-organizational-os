@@ -134,6 +134,7 @@ export type Workspace = {
   googleCalendar?: GoogleCalendarStatus;
   environment?: 'local' | 'hosted';
   dailyPlans?: DailyPlan[];
+  dailyPlanTasks?: { planId: string; taskId: string }[];
   slackConnected?: boolean;
   googleDrive?: {
     configured: boolean;

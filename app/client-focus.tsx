@@ -475,6 +475,7 @@ export default function ClientFocus({
             <TabsTrigger value="work">
               Work<span>{open.length}</span>
             </TabsTrigger>
+            <TabsTrigger value="log">Log</TabsTrigger>
             <TabsTrigger value="meetings">Meetings</TabsTrigger>
             <TabsTrigger value="brand">Brand & context</TabsTrigger>
             <TabsTrigger value="resources">Library & tools</TabsTrigger>
@@ -763,6 +764,8 @@ export default function ClientFocus({
       {tab === 'overview' && (
         <ConnectedNotes data={data} target={{ type: 'space', id: space.id }} />
       )}
+      {tab === 'log' && <ClientLog space={space} data={data} act={act} busy={busy} ready={ready} />}
+
       {tab === 'work' && (
         <div className="cf-tab-body">
           <PanelHeading
@@ -1936,6 +1939,107 @@ export function MeetingEditor({
             )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// The client's log: every event on this space's timeline, newest first, with
+// a quick entry box that writes through the same capture-entry command the
+// Desk's log panel uses. What is written here is what is shown here.
+function ClientLog({
+  space,
+  data,
+  act,
+  busy,
+  ready,
+}: {
+  space: Space;
+  data: Workspace;
+  act: Action;
+  busy: boolean;
+  ready: boolean;
+}) {
+  const [body, setBody] = useState('');
+  const [saving, setSaving] = useState(false);
+  const request = useRef<{ body: string; id: string } | null>(null);
+  const events = data.spaceEvents
+    .filter((event) => event.spaceId === space.id)
+    .slice()
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const save = async () => {
+    const text = body.trim();
+    if (!text || saving || busy || !ready) return;
+    if (request.current?.body !== text)
+      request.current = { body: text, id: crypto.randomUUID() };
+    setSaving(true);
+    try {
+      if (
+        await act({
+          type: 'capture-entry',
+          kind: 'note',
+          captureText: text,
+          captureDay: new Date().toISOString().slice(0, 10),
+          captureId: request.current.id,
+          contextProject: null,
+          contextSpace: space.id,
+          pins: [],
+          targetType: 'space',
+          targetId: space.id,
+          meetingDate: '',
+          meetingTime: '',
+          meetingOffset: null,
+        })
+      ) {
+        request.current = null;
+        setBody('');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="cf-tab-body">
+      <div className="cf-log-entry">
+        <textarea
+          rows={2}
+          value={body}
+          placeholder={'Add to ' + space.name + '\u2019s log\u2026'}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void save();
+            }
+          }}
+        />
+        <Button
+          type="button"
+          disabled={saving || !body.trim() || busy || !ready}
+          onClick={() => void save()}
+        >
+          {saving ? 'Storing\u2026' : 'Store'}
+        </Button>
+      </div>
+      {events.length ? (
+        <ul className="cf-log">
+          {events.map((event) => (
+            <li key={event.id}>
+              <p>{event.body.replace(/^Captured note: /, '')}</p>
+              <small className="muted">
+                {event.createdAt.slice(0, 10)}
+                {event.actor && event.actor !== 'me'
+                  ? ' · ' + event.actor
+                  : ''}
+              </small>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">
+          Nothing logged yet. Write here, or from the Desk:
+          &ldquo;add to {space.name} log&rdquo;.
+        </p>
+      )}
     </div>
   );
 }

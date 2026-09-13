@@ -1,15 +1,17 @@
 'use client';
+import { taskSpaceId } from '@/lib/task-context';
 import FinishDay from './finish-day';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ArrowRight,
   CalendarDays,
+  Check,
   CheckCheck,
   ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildDailyBrief, localDay, taskContext } from '@/lib/workspace-brief';
-import type { Workspace, Task } from '@/lib/model';
+import type { DailyPlan, Workspace, Task } from '@/lib/model';
 
 export function useWorkspaceClock() {
   const [now, setNow] = useState(() => new Date());
@@ -115,32 +117,26 @@ export default function Today({
         <p>Opening your day…</p>
       ) : (
         <>
-          <div className="today-plan-status">
-            <span>
-              {plan ? 'Daily plan committed' : 'No daily plan committed yet'} ·{' '}
-              {brief.planned.length} planned · {brief.carryover.length} carried
-              over
-            </span>
-            {plan && (
-              <span>
-                {statuses[plan.deliveryStatus]}
-                {data.slackConnected &&
-                  ['failed', 'pending', 'not_connected'].includes(
-                    plan.deliveryStatus,
-                  ) && (
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() =>
-                        void act({ type: 'daily-plan-deliver', id: plan.id })
-                      }
-                    >
-                      Send to Slack
-                    </Button>
-                  )}
-              </span>
-            )}
-          </div>
+          {plan ? (
+            <TodaysPlan
+              plan={plan}
+              data={data}
+              act={act}
+              busy={busy}
+              openTask={openTask}
+              slackStatus={statuses[plan.deliveryStatus]}
+            />
+          ) : (
+            <section className="today-plan-spine today-plan-empty">
+              <header>
+                <h2>Today&rsquo;s plan</h2>
+              </header>
+              <p className="muted">
+                No plan committed yet · {brief.carryover.length} carried over.
+                Commit one and it becomes the spine of this page.
+              </p>
+            </section>
+          )}
           {plan?.deliveryError && (
             <p className="daily-plan-warning">{plan.deliveryError}</p>
           )}
@@ -272,5 +268,96 @@ export default function Today({
         </>
       )}
     </div>
+  );
+}
+
+// The committed plan is the spine of Today: its tasks, checkable in place,
+// with honest progress and the Slack delivery state alongside.
+function TodaysPlan({
+  plan,
+  data,
+  act,
+  busy,
+  openTask,
+  slackStatus,
+}: {
+  plan: DailyPlan;
+  data: Workspace;
+  act: (command: Record<string, unknown>) => Promise<boolean>;
+  busy: boolean;
+  openTask: (id: string) => void;
+  slackStatus: string;
+}) {
+  const links = (data.dailyPlanTasks || []).filter(
+    (link) => link.planId === plan.id,
+  );
+  const tasks = links
+    .map((link) => data.tasks.find((t) => t.id === link.taskId))
+    .filter((t): t is NonNullable<typeof t> => !!t);
+  const done = tasks.filter((t) => t.stage === 'Done').length;
+  return (
+    <section className="today-plan-spine">
+      <header>
+        <h2>Today&rsquo;s plan</h2>
+        <span className="muted">
+          {done} of {tasks.length} done · {slackStatus}
+          {data.slackConnected &&
+            ['failed', 'pending', 'not_connected'].includes(
+              plan.deliveryStatus,
+            ) && (
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() =>
+                  void act({ type: 'daily-plan-deliver', id: plan.id })
+                }
+              >
+                Send to Slack
+              </Button>
+            )}
+        </span>
+      </header>
+      {tasks.length ? (
+        <ul className="today-plan-lines">
+          {tasks.map((task) => {
+            const space = data.spaces.find(
+              (s) => s.id === taskSpaceId(data, task),
+            );
+            return (
+              <li key={task.id} className={task.stage === 'Done' ? 'done' : ''}>
+                <button
+                  className="today-plan-check"
+                  aria-label={
+                    task.stage === 'Done' ? 'Completed' : 'Mark done'
+                  }
+                  disabled={busy || task.stage === 'Done'}
+                  onClick={() =>
+                    void act({
+                      type: 'complete',
+                      id: task.id,
+                      revision: task.revision,
+                    })
+                  }
+                >
+                  {task.stage === 'Done' ? <Check size={15} /> : null}
+                </button>
+                <button
+                  className="today-plan-title"
+                  onClick={() => openTask(task.id)}
+                >
+                  {task.title}
+                </button>
+                {space && <span className="muted">{space.name}</span>}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="muted">
+          The plan&rsquo;s tasks are done and archived, or it was committed
+          before task linking existed.
+        </p>
+      )}
+    </section>
   );
 }
