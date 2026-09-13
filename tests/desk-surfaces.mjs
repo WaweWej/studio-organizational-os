@@ -112,4 +112,11 @@ assert.equal(cc('/add client Fjordlys')?.name, 'Fjordlys');
 assert.equal(cc('/open calendar')?.view, 'calendar');
 assert.equal(cc('/add to Rørvig Teater log')?.type, 'client-log');
 
+// /goals opens the Studio roadmap project when it exists.
+const withRoadmap = { ...data, projects: [{ id: 'pr', name: 'Studio roadmap' }] };
+assert.equal(parseSurfaceIntent('/goals', withRoadmap, nav)?.projectId, 'pr');
+assert.equal(parseSurfaceIntent('goals', withRoadmap, nav)?.projectId, 'pr');
+assert.equal(parseSurfaceIntent('roadmap', withRoadmap, nav)?.projectId, 'pr');
+assert.equal(parseSurfaceIntent('/goals', data, nav), null);
+
 console.log('PASS: surface intents — log phrases resolve clients by exact, prefix, and word match with deterministic ambiguity refusal, seeds carry through, and only explicit task phrasing creates tasks.');

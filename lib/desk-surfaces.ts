@@ -107,6 +107,16 @@ export function parseSurfaceIntent(
   const create = CREATE_CLIENT.exec(text);
   if (create) return { type: 'create-client', name: create[1].trim() };
   if (!options.navigation) return null;
+  // /goals and its spellings open the Studio roadmap project when it exists.
+  if (/^\s*(?:goals?|roadmap)\s*$/i.test(text)) {
+    const roadmap = resolveProjectByName(data, 'Studio roadmap');
+    if (roadmap)
+      return {
+        type: 'open-project',
+        projectId: roadmap.id,
+        projectName: roadmap.name,
+      };
+  }
   const open = OPEN.exec(text);
   if (!open) return null;
   const wanted = open[1].toLowerCase();

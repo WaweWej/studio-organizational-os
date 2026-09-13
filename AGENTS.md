@@ -36,3 +36,5 @@ Keep durable product context and current decisions in these checked-in documents
 Use `codex/` for new development branches unless the user specifies another. GitHub is the development source remote. Publishing the Studio app through Sites is a separate operation: preserve the existing project ID and do not publish merely to synchronize development files.
 
 Recent structural changes (self-hosted Cloudflare deployment, built-in sign-in, optional R2, Google-connection hardening) are summarized for the next agent in docs/CHANGES-2026-09.md; read it before assuming the August shape of the codebase.
+
+The agreed build direction lives in docs/ROADMAP.md; consult it before proposing or starting new construction.
