@@ -15,7 +15,7 @@ registerHooks({
   },
 });
 
-const { matchSpaceInTitle, autoLinkCalendarEvents, linkCalendarSpace } =
+const { matchSpaceInTitle, matchSpaceForEvent, autoLinkCalendarEvents, linkCalendarSpace } =
   await import('../lib/calendar-space-link.ts');
 
 const spaces = [
@@ -33,6 +33,41 @@ assert.equal(matchSpaceInTitle('Harbor status', spaces), null);
 // Substrings inside words never match.
 assert.equal(matchSpaceInTitle('Feelgoodcompanyism workshop', spaces), null);
 assert.equal(matchSpaceInTitle('Team lunch', spaces), null);
+
+// The full law: email decides first, exactly and case-insensitively.
+const emailSpaces = [
+  { id: 'good', name: 'Goodcompany', contactEmail: 'jens@goodcompany.dk' },
+  { id: 'harbor', name: 'Harbor Coffee', contactEmail: '' },
+];
+assert.equal(
+  matchSpaceForEvent(
+    { title: 'Status', attendees: 'me@homeymedia.dk,Jens@GoodCompany.dk' },
+    emailSpaces,
+  )?.id,
+  'good',
+);
+// Two clients sharing an address refuse.
+assert.equal(
+  matchSpaceForEvent(
+    { title: 'Status', attendees: 'shared@x.dk' },
+    [
+      { id: 'a', name: 'A', contactEmail: 'shared@x.dk' },
+      { id: 'b', name: 'B', contactEmail: 'shared@x.dk' },
+    ],
+  ),
+  null,
+);
+// The name fallback applies only to clients with no email on file: an
+// email on record declares how the client is recognized.
+assert.equal(
+  matchSpaceForEvent({ title: 'Harbor Coffee tasting', attendees: '' }, emailSpaces)
+    ?.id,
+  'harbor',
+);
+assert.equal(
+  matchSpaceForEvent({ title: 'Goodcompany kickoff', attendees: '' }, emailSpaces),
+  null,
+);
 
 // Read-time auto-linking: persists, patches rows in place, respects
 // manual and ignored links.
@@ -111,5 +146,5 @@ await assert.rejects(
 );
 
 console.log(
-  'PASS: calendar-client linking — word-bounded unique matching, ambiguity and substring refusals, read-time auto-link persisting and patching in place, manual and ignored links respected through the boundary.',
+  'PASS: calendar-client linking — email-first matching with shared-address refusal, name fallback only for clients without an email on file, word-bounded unique title matching, read-time auto-link persisting and patching in place, manual and ignored links respected through the boundary.',
 );

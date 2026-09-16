@@ -493,6 +493,7 @@ export default function ClientFocus({
 
       {tab === 'overview' && (
         <>
+          <UpcomingMeeting space={space} data={data} />
           <div className="cf-pulse">
             <span>
               <span className="cf-live-dot" />
@@ -1401,6 +1402,18 @@ function BrandEditor({
               placeholder="https://…"
             />
           </Field>
+          <Field label="Contact email">
+            <Input
+              value={draft.contactEmail}
+              onChange={(e) => field('contactEmail', e.target.value)}
+              placeholder="name@company.dk"
+              type="email"
+            />
+          </Field>
+          <p className="cf-form-hint">
+            Calendar events with this address among the attendees link to
+            this client.
+          </p>
           <p className="cf-form-hint">
             Use a hosted image address. Leave it empty for a cover using the
             brand color.
@@ -2085,6 +2098,40 @@ function CalendarMeetings({ space, data }: { space: Space; data: Workspace }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// The next calendar meeting linked to this client, on the page you open
+// first. Nothing shown when the calendar holds nothing.
+function UpcomingMeeting({ space, data }: { space: Space; data: Workspace }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const next = (data.calendarEvents || [])
+    .filter((event) => event.spaceId === space.id && event.date >= today)
+    .sort((a, b) =>
+      a.date === b.date
+        ? a.time < b.time
+          ? -1
+          : 1
+        : a.date < b.date
+          ? -1
+          : 1,
+    )[0];
+  if (!next) return null;
+  return (
+    <div className="cf-upcoming-meeting">
+      <span className="cf-upcoming-label">Upcoming meeting</span>
+      <span>
+        {next.date}
+        {next.time ? ' · ' + next.time : ''}
+      </span>
+      {next.googleUrl ? (
+        <a href={next.googleUrl} target="_blank" rel="noreferrer">
+          {next.title}
+        </a>
+      ) : (
+        <span>{next.title}</span>
+      )}
     </div>
   );
 }

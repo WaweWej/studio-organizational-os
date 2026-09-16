@@ -513,3 +513,17 @@ always wins, and an ignored event is never relinked. The client page's
 Meetings tab shows the linked calendar events upcoming-first, marked
 "matched by name" when automatic. Migration 0024; 45 commands in the
 catalog; covered by a dedicated suite.
+
+## Email decides; the overview announces · 13 September 2026
+
+The linking law revised by the owner. Sync now stores attendee email
+addresses on events, clients carry a contact email (client-edit, with a
+form field under Brand & context), and matching decides by email first:
+a client whose contact email is among the attendees links, exactly and
+case-insensitively, two clients sharing an address refusing. The name
+fallback applies only to clients with no email on file — an email on the
+record is a declaration of how that client is recognized. Auto links
+made under the name-only law were reset by migration 0025 and re-decide
+under the new law at next read. The client Overview now opens with the
+next linked meeting as "Upcoming meeting"; the Meetings tab keeps the
+full upcoming list.

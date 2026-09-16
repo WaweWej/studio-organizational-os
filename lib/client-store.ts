@@ -179,6 +179,14 @@ export async function mutateClient(c: Context, input: Record<string, unknown>) {
       audience: textValue(input.audience, 'Audience', 5000),
       voice: textValue(input.voice, 'Brand voice', 5000),
       website: webUrl(input.website, 'Website'),
+      contactEmail: (() => {
+        const value = textValue(input.contactEmail, 'Contact email', 120)
+          .trim()
+          .toLowerCase();
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
+          throw new AppError('Enter a valid contact email, or leave it empty.');
+        return value;
+      })(),
       coverUrl: webUrl(input.coverUrl, 'Cover image', true),
       logoUrl: webUrl(input.logoUrl, 'Logo image', true),
       color,

@@ -274,8 +274,8 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
   // are connected the moment they exist.
   await autoLinkCalendarEvents(
     c,
-    (out.calendarEvents as { id: string; title: string; spaceId: string; spaceLink: string }[]) || [],
-    (out.spaces as { id: string; name: string }[]) || [],
+    (out.calendarEvents as { id: string; title: string; attendees?: string; spaceId: string; spaceLink: string }[]) || [],
+    (out.spaces as { id: string; name: string; contactEmail?: string }[]) || [],
   ).catch(() => 0);
   out.calendarEvents = (
     out.calendarEvents as NonNullable<Workspace['calendarEvents']>

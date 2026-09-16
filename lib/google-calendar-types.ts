@@ -25,7 +25,7 @@ export type GoogleEvent = {
   htmlLink?: string;
   start?: { date?: string; dateTime?: string; timeZone?: string };
   end?: { date?: string; dateTime?: string; timeZone?: string };
-  attendees?: { self?: boolean; responseStatus?: string }[];
+  attendees?: { self?: boolean; responseStatus?: string; email?: string }[];
 };
 export type GoogleConnection = {
   org: string;

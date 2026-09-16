@@ -104,6 +104,11 @@ export function normalizeGoogleEvent(event: GoogleEvent, zone: string) {
     googleStart: start,
     googleEnd: end,
     googleUrl: url,
+    attendees: (event.attendees || [])
+      .map((a) => (a.email || '').trim().toLowerCase())
+      .filter(Boolean)
+      .slice(0, 50)
+      .join(','),
   };
 }
 // Fetch the complete rolling window before changing stored events. A failed page

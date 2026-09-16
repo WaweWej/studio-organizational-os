@@ -28,6 +28,7 @@ export type Space = {
   logoUrl: string;
   brandStyle: string;
   revision: number;
+  contactEmail: string;
 };
 export type Meeting = {
   id: string;
@@ -209,6 +210,7 @@ export type CalendarEvent = {
   updatedAt: string;
   spaceId: string;
   spaceLink: string;
+  attendees: string;
 };
 export function emptyWorkspace(name = 'You'): Workspace {
   return {
@@ -293,6 +295,7 @@ export function initialWorkspace(): Workspace {
     website: '',
     coverUrl: id === 'nord' ? '/images/nord-form-cover.png' : '',
     logoUrl: '',
+    contactEmail: '',
     brandStyle: id === 'nord' ? 'serif' : 'sans',
     revision: 0,
   }));

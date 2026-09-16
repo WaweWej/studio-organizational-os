@@ -214,7 +214,8 @@ export const commandCatalog: CommandDescriptor[] = [
   {
     name: 'client-edit',
     group: 'clients',
-    summary: 'Edit a client’s brief, brand and context fields.',
+    summary:
+      'Edit a client’s brief, brand and context fields, including the contact email used to match calendar events.',
     risk: 'write',
     fields: [id('id')],
   },

@@ -1756,3 +1756,25 @@
   font-variant-numeric: tabular-nums;
   flex: none;
 }
+
+/* Upcoming meeting on the client overview */
+.cf-upcoming-meeting {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1.1rem;
+  background: #fff;
+}
+.cf-upcoming-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 0, 0, 0.55);
+}
+.cf-upcoming-meeting span {
+  font-variant-numeric: tabular-nums;
+}

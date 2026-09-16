@@ -5,10 +5,11 @@
 // exists. A manual link always wins; an ignored event is never relinked.
 import { AppError } from './validation';
 
-type SpaceRef = { id: string; name: string };
+type SpaceRef = { id: string; name: string; contactEmail?: string };
 type EventRef = {
   id: string;
   title: string;
+  attendees?: string;
   spaceId: string;
   spaceLink: string;
 };
@@ -35,6 +36,34 @@ export function matchSpaceInTitle(
   return matches.length === 1 ? matches[0] : null;
 }
 
+// The full law. Email decides first: a client whose contact email is
+// among the event's attendees. Exact and case-insensitive; two clients
+// sharing an address refuse. Only when no email decides does the name
+// fallback apply, and only for clients with no email on file — an email
+// on the client record is a declaration that email is how this client is
+// recognized.
+export function matchSpaceForEvent(
+  event: Pick<EventRef, 'title' | 'attendees'>,
+  spaces: SpaceRef[],
+): SpaceRef | null {
+  const attendees = (event.attendees || '')
+    .split(',')
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean);
+  if (attendees.length) {
+    const byEmail = spaces.filter((space) => {
+      const email = (space.contactEmail || '').trim().toLowerCase();
+      return email !== '' && attendees.includes(email);
+    });
+    if (byEmail.length === 1) return byEmail[0];
+    if (byEmail.length > 1) return null;
+  }
+  return matchSpaceInTitle(
+    event.title,
+    spaces.filter((space) => !(space.contactEmail || '').trim()),
+  );
+}
+
 // Link every unlinked event whose title names exactly one client. Patches
 // the given rows in place so the response that triggered the pass already
 // shows the links, and persists with a guard so a manual link set in the
@@ -48,7 +77,7 @@ export async function autoLinkCalendarEvents(
   const updates: { id: string; spaceId: string }[] = [];
   for (const event of events) {
     if (event.spaceId || event.spaceLink) continue;
-    const space = matchSpaceInTitle(event.title, spaces);
+    const space = matchSpaceForEvent(event, spaces);
     if (!space) continue;
     event.spaceId = space.id;
     event.spaceLink = 'auto';
