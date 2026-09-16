@@ -198,14 +198,15 @@ export async function importGoogleEvents(
       old.googleEnd === value.googleEnd &&
       old.googleUrl === value.googleUrl &&
       old.date === value.date &&
-      old.time === value.time
+      old.time === value.time &&
+      old.attendees === value.attendees
     )
       continue;
     const nonce = crypto.randomUUID();
     writes.push(
       c.db
-        .prepare(`INSERT INTO calendarEvents (org,id,title,kind,date,time,description,revision,archived,actor,createdAt,updatedAt,fingerprint,lastMutation,googleCalendarId,googleEventId,googleUrl,googleStart,googleEnd)
-      VALUES (?,?,?,'meeting',?,?,?,0,0,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(org,id) DO UPDATE SET title=excluded.title,date=excluded.date,time=excluded.time,description=excluded.description,archived=0,revision=calendarEvents.revision+1,updatedAt=excluded.updatedAt,fingerprint=excluded.fingerprint,lastMutation=excluded.lastMutation,googleUrl=excluded.googleUrl,googleStart=excluded.googleStart,googleEnd=excluded.googleEnd`)
+        .prepare(`INSERT INTO calendarEvents (org,id,title,kind,date,time,description,attendees,revision,archived,actor,createdAt,updatedAt,fingerprint,lastMutation,googleCalendarId,googleEventId,googleUrl,googleStart,googleEnd)
+      VALUES (?,?,?,'meeting',?,?,?,?,0,0,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(org,id) DO UPDATE SET title=excluded.title,date=excluded.date,time=excluded.time,description=excluded.description,attendees=excluded.attendees,archived=0,revision=calendarEvents.revision+1,updatedAt=excluded.updatedAt,fingerprint=excluded.fingerprint,lastMutation=excluded.lastMutation,googleUrl=excluded.googleUrl,googleStart=excluded.googleStart,googleEnd=excluded.googleEnd`)
         .bind(
           c.org,
           id,
@@ -213,6 +214,7 @@ export async function importGoogleEvents(
           value.date,
           value.time,
           value.description,
+          value.attendees,
           c.actor,
           timestamp,
           timestamp,
