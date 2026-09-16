@@ -183,6 +183,13 @@
       "when": 1789549472254,
       "tag": "0025_new_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1789550287673,
+      "tag": "0026_youthful_morlun",
+      "breakpoints": true
     }
   ]
 }

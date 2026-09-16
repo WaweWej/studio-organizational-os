@@ -50,6 +50,8 @@ export const spaces = sqliteTable(
     voice: text('voice').notNull().default(''),
     website: text('website').notNull().default(''),
     contactEmail: text('contactEmail').notNull().default(''),
+    contactName: text('contactName').notNull().default(''),
+    contactPhone: text('contactPhone').notNull().default(''),
     coverUrl: text('coverUrl').notNull().default(''),
     logoUrl: text('logoUrl').notNull().default(''),
     brandStyle: text('brandStyle').notNull().default('sans'),

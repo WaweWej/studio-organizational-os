@@ -1778,3 +1778,15 @@
 .cf-upcoming-meeting span {
   font-variant-numeric: tabular-nums;
 }
+
+/* Contact line on the client overview */
+.cf-contact-line {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin: 0 0 0.8rem;
+}
+.cf-contact-line a {
+  color: inherit;
+}

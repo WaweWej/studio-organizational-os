@@ -179,6 +179,8 @@ export async function mutateClient(c: Context, input: Record<string, unknown>) {
       audience: textValue(input.audience, 'Audience', 5000),
       voice: textValue(input.voice, 'Brand voice', 5000),
       website: webUrl(input.website, 'Website'),
+      contactName: textValue(input.contactName, 'Contact person', 100),
+      contactPhone: textValue(input.contactPhone, 'Contact phone', 40),
       contactEmail: (() => {
         const value = textValue(input.contactEmail, 'Contact email', 120)
           .trim()

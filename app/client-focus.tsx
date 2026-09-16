@@ -493,6 +493,7 @@ export default function ClientFocus({
 
       {tab === 'overview' && (
         <>
+          <ClientContact space={space} />
           <UpcomingMeeting space={space} data={data} />
           <div className="cf-pulse">
             <span>
@@ -1304,6 +1305,34 @@ function BrandEditor({
               />
             </Field>
           </div>
+          <Field label="Contact person">
+            <Input
+              value={draft.contactName}
+              onChange={(e) => field('contactName', e.target.value)}
+              maxLength={100}
+            />
+          </Field>
+          <div className="cf-fields">
+            <Field label="Contact email">
+              <Input
+                value={draft.contactEmail}
+                onChange={(e) => field('contactEmail', e.target.value)}
+                placeholder="name@company.dk"
+                type="email"
+              />
+            </Field>
+            <Field label="Phone">
+              <Input
+                value={draft.contactPhone}
+                onChange={(e) => field('contactPhone', e.target.value)}
+                maxLength={40}
+              />
+            </Field>
+          </div>
+          <p className="cf-form-hint">
+            Calendar events with the contact email among the attendees link
+            to this client.
+          </p>
           <Field label="The brief">
             <Textarea
               value={draft.brief}
@@ -1402,18 +1431,6 @@ function BrandEditor({
               placeholder="https://…"
             />
           </Field>
-          <Field label="Contact email">
-            <Input
-              value={draft.contactEmail}
-              onChange={(e) => field('contactEmail', e.target.value)}
-              placeholder="name@company.dk"
-              type="email"
-            />
-          </Field>
-          <p className="cf-form-hint">
-            Calendar events with this address among the attendees link to
-            this client.
-          </p>
           <p className="cf-form-hint">
             Use a hosted image address. Leave it empty for a cover using the
             brand color.
@@ -2133,5 +2150,30 @@ function UpcomingMeeting({ space, data }: { space: Space; data: Workspace }) {
         <span>{next.title}</span>
       )}
     </div>
+  );
+}
+
+// The client's contact, shown where you look first. Nothing rendered
+// until something is noted.
+function ClientContact({ space }: { space: Space }) {
+  const parts = [
+    space.contactName,
+    space.contactEmail,
+    space.contactPhone,
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  return (
+    <p className="cf-contact-line">
+      <span className="cf-upcoming-label">Contact</span>
+      {space.contactName && <span>{space.contactName}</span>}
+      {space.contactEmail && (
+        <a href={'mailto:' + space.contactEmail}>{space.contactEmail}</a>
+      )}
+      {space.contactPhone && (
+        <a href={'tel:' + space.contactPhone.replace(/\s+/g, '')}>
+          {space.contactPhone}
+        </a>
+      )}
+    </p>
   );
 }

@@ -29,6 +29,8 @@ export type Space = {
   brandStyle: string;
   revision: number;
   contactEmail: string;
+  contactName: string;
+  contactPhone: string;
 };
 export type Meeting = {
   id: string;
@@ -296,6 +298,8 @@ export function initialWorkspace(): Workspace {
     coverUrl: id === 'nord' ? '/images/nord-form-cover.png' : '',
     logoUrl: '',
     contactEmail: '',
+    contactName: '',
+    contactPhone: '',
     brandStyle: id === 'nord' ? 'serif' : 'sans',
     revision: 0,
   }));

@@ -540,3 +540,11 @@ and contact emails) and skipped until that set changes, so a client
 created later still claims its events; and writes go in one bounded
 batch. A steady-state request now does no matching work at all. The
 memo and the late-client re-decision are covered in the suite.
+
+## The client carries its contact · 16 September 2026
+
+Clients now hold a contact person, contact email, and phone — edited
+under Brand & context beside the account lead, shown on the Overview as
+a contact line with mail and tel links, and read by the system from
+there: the contact email is what calendar matching decides by. Migration
+0026.

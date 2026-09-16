@@ -154,6 +154,8 @@ export async function commitDailyPlan(
           coverUrl: '',
           logoUrl: '',
           contactEmail: '',
+          contactName: '',
+          contactPhone: '',
           brandStyle: 'sans',
           revision: 0,
         };
