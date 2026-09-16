@@ -527,3 +527,16 @@ made under the name-only law were reset by migration 0025 and re-decide
 under the new law at next read. The client Overview now opens with the
 next linked meeting as "Upcoming meeting"; the Meetings tab keeps the
 full upcoming list.
+
+## The matcher learns to remember · 16 September 2026
+
+Production hit Cloudflare's CPU limit (error 1102) and the read-time
+matcher was the culprit: events matching no client were re-tested
+against every client on every request, each test compiling a fresh
+Unicode regex. Three corrections, feature unchanged: client patterns
+compile once per pass, not per event; every verdict is remembered on the
+event — a non-match is marked against a hash of the client set (names
+and contact emails) and skipped until that set changes, so a client
+created later still claims its events; and writes go in one bounded
+batch. A steady-state request now does no matching work at all. The
+memo and the late-client re-decision are covered in the suite.

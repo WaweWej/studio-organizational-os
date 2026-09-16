@@ -145,6 +145,54 @@ await assert.rejects(
   /client was not found/,
 );
 
+// The memo: a no-match verdict is remembered against the client-set hash
+// and skipped on later passes; a changed client set re-decides it. The
+// exact case the feature exists for — client created after the event —
+// must keep working through the memo.
+{
+  const memoOrg = 'org-memo';
+  await db
+    .prepare(
+      `INSERT INTO spaces (${spaceCols}) VALUES (?,?,?,'client','#000','','','','','','','','','','','','',0,'n')`,
+    )
+    .bind(memoOrg, 'late', 'Latecompany')
+    .run();
+  await db
+    .prepare(
+      "INSERT INTO calendarEvents (org,id,title,kind,date,time,description,spaceId,spaceLink,revision,archived,actor,createdAt,updatedAt,fingerprint,lastMutation) VALUES (?,?,?,?,?,?,?,?,?,0,0,'me','2026-09-13','2026-09-13','f','n')",
+    )
+    .bind(memoOrg, 'm1', 'Nomatch here', 'meeting', '2026-09-14', '', '', '', '')
+    .run();
+  const one = (
+    await db
+      .prepare('SELECT id,title,attendees,spaceId,spaceLink FROM calendarEvents WHERE org=?')
+      .bind(memoOrg)
+      .all()
+  ).results;
+  const setA = [{ id: 'late', name: 'Latecompany', contactEmail: '' }];
+  assert.equal(await autoLinkCalendarEvents({ db, org: memoOrg }, one, setA), 0);
+  assert.match(one[0].spaceLink, /^none:/);
+  const markA = one[0].spaceLink;
+  // Same client set again: the verdict holds, nothing is re-decided.
+  assert.equal(await autoLinkCalendarEvents({ db, org: memoOrg }, one, setA), 0);
+  assert.equal(one[0].spaceLink, markA);
+  // The client the event names is created: the changed set re-decides
+  // and the event links.
+  const setB = [
+    ...setA,
+    { id: 'nomatch', name: 'Nomatch', contactEmail: '' },
+  ];
+  const rows2 = (
+    await db
+      .prepare('SELECT id,title,attendees,spaceId,spaceLink FROM calendarEvents WHERE org=?')
+      .bind(memoOrg)
+      .all()
+  ).results;
+  assert.equal(await autoLinkCalendarEvents({ db, org: memoOrg }, rows2, setB), 1);
+  assert.equal(rows2[0].spaceId, 'nomatch');
+  assert.equal(rows2[0].spaceLink, 'auto');
+}
+
 console.log(
-  'PASS: calendar-client linking — email-first matching with shared-address refusal, name fallback only for clients without an email on file, word-bounded unique title matching, read-time auto-link persisting and patching in place, manual and ignored links respected through the boundary.',
+  'PASS: calendar-client linking — email-first matching with shared-address refusal, name fallback only for clients without an email on file, word-bounded unique title matching, read-time auto-link persisting and patching in place, no-match verdicts memoized against the client-set hash and re-decided when the set changes, manual and ignored links respected through the boundary.',
 );

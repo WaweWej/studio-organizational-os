@@ -10,9 +10,32 @@ type EventRef = {
   id: string;
   title: string;
   attendees?: string;
+  archived?: number;
   spaceId: string;
   spaceLink: string;
 };
+
+type SpaceMatcher = { space: SpaceRef; email: string; pattern: RegExp | null };
+
+// Compile each client's title pattern once; matching hundreds of events
+// then costs regex tests, not regex constructions.
+export function compileSpaceMatchers(spaces: SpaceRef[]): SpaceMatcher[] {
+  return spaces.map((space) => {
+    const name = space.name.trim();
+    return {
+      space,
+      email: (space.contactEmail || '').trim().toLowerCase(),
+      pattern: name
+        ? new RegExp(
+            '(?:^|[^\\p{L}\\p{N}])' +
+              escape(name) +
+              '(?:[^\\p{L}\\p{N}]|$)',
+            'iu',
+          )
+        : null,
+    };
+  });
+}
 type Db = { db: D1Database };
 
 const escape = (value: string) =>
@@ -45,53 +68,97 @@ export function matchSpaceInTitle(
 export function matchSpaceForEvent(
   event: Pick<EventRef, 'title' | 'attendees'>,
   spaces: SpaceRef[],
+  compiled?: SpaceMatcher[],
 ): SpaceRef | null {
+  const matchers = compiled || compileSpaceMatchers(spaces);
   const attendees = (event.attendees || '')
     .split(',')
     .map((a) => a.trim().toLowerCase())
     .filter(Boolean);
   if (attendees.length) {
-    const byEmail = spaces.filter((space) => {
-      const email = (space.contactEmail || '').trim().toLowerCase();
-      return email !== '' && attendees.includes(email);
-    });
-    if (byEmail.length === 1) return byEmail[0];
+    const byEmail = matchers.filter(
+      (m) => m.email !== '' && attendees.includes(m.email),
+    );
+    if (byEmail.length === 1) return byEmail[0].space;
     if (byEmail.length > 1) return null;
   }
-  return matchSpaceInTitle(
-    event.title,
-    spaces.filter((space) => !(space.contactEmail || '').trim()),
+  const byTitle = matchers.filter(
+    (m) => m.email === '' && m.pattern !== null && m.pattern.test(event.title),
   );
+  return byTitle.length === 1 ? byTitle[0].space : null;
 }
 
-// Link every unlinked event whose title names exactly one client. Patches
-// the given rows in place so the response that triggered the pass already
-// shows the links, and persists with a guard so a manual link set in the
-// meantime is never overwritten.
+// A stable fingerprint of the client set as matching sees it: names and
+// contact emails. When it changes — a client created, renamed, or given
+// an email — previously unmatched events are re-decided; while it holds,
+// a request does no matching work at all.
+export function spaceSetHash(spaces: SpaceRef[]): string {
+  const source = spaces
+    .map((s) => s.id + '\u0000' + s.name + '\u0000' + (s.contactEmail || ''))
+    .sort()
+    .join('\u0001');
+  let hash = 2166136261;
+  for (let i = 0; i < source.length; i++) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+// Link every undecided event whose title or attendees name exactly one
+// client. Every verdict is remembered on the event: a match links it, a
+// non-match is marked against the current client-set hash and skipped on
+// every later read until the client set changes. Patches rows in place
+// so the response that triggered the pass already shows the links, and
+// persists in one batch with guards so manual links set in the meantime
+// are never overwritten. Work per pass is bounded; the remainder is
+// decided on subsequent reads.
 export async function autoLinkCalendarEvents(
   c: Db & { org: string },
   events: EventRef[],
   spaces: SpaceRef[],
+  limit = 50,
 ): Promise<number> {
   if (!spaces.length) return 0;
-  const updates: { id: string; spaceId: string }[] = [];
+  const hash = spaceSetHash(spaces);
+  const none = 'none:' + hash;
+  const compiled = compileSpaceMatchers(spaces);
+  const links: { id: string; spaceId: string }[] = [];
+  const marks: string[] = [];
   for (const event of events) {
-    if (event.spaceId || event.spaceLink) continue;
-    const space = matchSpaceForEvent(event, spaces);
-    if (!space) continue;
-    event.spaceId = space.id;
-    event.spaceLink = 'auto';
-    updates.push({ id: event.id, spaceId: space.id });
+    if (event.spaceId || event.archived) continue;
+    if (event.spaceLink && !event.spaceLink.startsWith('none:')) continue;
+    if (event.spaceLink === none) continue;
+    if (links.length + marks.length >= limit) break;
+    const previous = event.spaceLink;
+    const space = matchSpaceForEvent(event, spaces, compiled);
+    if (space) {
+      event.spaceId = space.id;
+      event.spaceLink = 'auto';
+      links.push({ id: event.id, spaceId: space.id });
+    } else {
+      event.spaceLink = none;
+      if (previous !== none) marks.push(event.id);
+    }
   }
-  for (const update of updates) {
-    await c.db
-      .prepare(
-        "UPDATE calendarEvents SET spaceId=?, spaceLink='auto' WHERE org=? AND id=? AND spaceId='' AND spaceLink=''",
-      )
-      .bind(update.spaceId, c.org, update.id)
-      .run();
-  }
-  return updates.length;
+  const statements = [
+    ...links.map((link) =>
+      c.db
+        .prepare(
+          "UPDATE calendarEvents SET spaceId=?, spaceLink='auto' WHERE org=? AND id=? AND spaceId='' AND (spaceLink='' OR spaceLink LIKE 'none:%')",
+        )
+        .bind(link.spaceId, c.org, link.id),
+    ),
+    ...marks.map((id) =>
+      c.db
+        .prepare(
+          "UPDATE calendarEvents SET spaceLink=? WHERE org=? AND id=? AND spaceId='' AND (spaceLink='' OR spaceLink LIKE 'none:%')",
+        )
+        .bind(none, c.org, id),
+    ),
+  ];
+  if (statements.length) await c.db.batch(statements);
+  return links.length;
 }
 
 // Manual linking through the boundary. An empty spaceId marks the event
