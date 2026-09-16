@@ -1730,3 +1730,29 @@
 .today-plan-empty {
   background: #fbfaf7;
 }
+
+/* Calendar meetings on the client page */
+.cf-calendar-meetings {
+  margin-bottom: 1.4rem;
+}
+.cf-calendar-meetings h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+.cf-calendar-meetings ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.cf-calendar-meetings li {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+.cf-calendar-meetings li > span:first-child {
+  color: rgba(0, 0, 0, 0.55);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}

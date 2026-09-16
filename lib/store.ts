@@ -1,3 +1,4 @@
+import { autoLinkCalendarEvents } from './calendar-space-link';
 import { resolveMembership } from './workspace-members';
 import { changeDayWork } from './day-work-store';
 import { googleStatus } from './google-calendar-sync';
@@ -268,6 +269,14 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
       0,
     ),
   };
+  // Read-time linking: any unlinked event whose title names exactly one
+  // client is linked now — so clients created after their meetings synced
+  // are connected the moment they exist.
+  await autoLinkCalendarEvents(
+    c,
+    (out.calendarEvents as { id: string; title: string; spaceId: string; spaceLink: string }[]) || [],
+    (out.spaces as { id: string; name: string }[]) || [],
+  ).catch(() => 0);
   out.calendarEvents = (
     out.calendarEvents as NonNullable<Workspace['calendarEvents']>
   ).filter((e) => (!e.archived || e.googleEventId) && (!e.googleEventId || e.actor === c.actor));
@@ -332,6 +341,11 @@ export async function mutate(
     const { createToken, revokeToken } = await import('./api-tokens');
     if (type === 'token-create') await createToken(c, input);
     else await revokeToken(c, input);
+    return;
+  }
+  if (type === 'calendar-link-space') {
+    const { linkCalendarSpace } = await import('./calendar-space-link');
+    await linkCalendarSpace(c, input);
     return;
   }
   if (type === 'member-invite' || type === 'member-revoke') {

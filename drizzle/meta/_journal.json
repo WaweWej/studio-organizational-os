@@ -169,6 +169,13 @@
       "when": 1789290017299,
       "tag": "0023_material_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1789548077627,
+      "tag": "0024_legal_tombstone",
+      "breakpoints": true
     }
   ]
 }

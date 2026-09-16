@@ -207,6 +207,8 @@ export type CalendarEvent = {
   actor: string;
   createdAt: string;
   updatedAt: string;
+  spaceId: string;
+  spaceLink: string;
 };
 export function emptyWorkspace(name = 'You'): Workspace {
   return {

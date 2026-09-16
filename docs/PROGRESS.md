@@ -500,3 +500,16 @@ history stays. Identity resolution: accepted membership wins, then a
 claimable invite, then the identity's own org exactly as before, so the
 owner's workspace and every existing stamp are untouched. Covered by a
 dedicated suite over the real migration set.
+
+## The calendar notices clients · 13 September 2026
+
+A calendar event whose title names exactly one client links to that
+client — word-bounded, case-insensitive, ambiguity refused, the same
+resolution discipline the Desk speaks. Matching runs at read time, so a
+client created after its meetings synced is connected the moment it
+exists. Links persist on the event (spaceId, spaceLink auto/manual/
+ignored); a manual link through the new calendar-link-space command
+always wins, and an ignored event is never relinked. The client page's
+Meetings tab shows the linked calendar events upcoming-first, marked
+"matched by name" when automatic. Migration 0024; 45 commands in the
+catalog; covered by a dedicated suite.

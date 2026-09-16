@@ -337,6 +337,14 @@ export const commandCatalog: CommandDescriptor[] = [
     fields: [id('id')],
   },
   {
+    name: 'calendar-link-space',
+    group: 'calendar',
+    summary:
+      'Link a calendar event to a client, or pass an empty spaceId to ignore it for automatic matching.',
+    risk: 'write',
+    fields: [id('id'), text('spaceId', false)],
+  },
+  {
     name: 'member-invite',
     group: 'access',
     summary:

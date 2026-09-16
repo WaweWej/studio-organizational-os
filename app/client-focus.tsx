@@ -812,6 +812,7 @@ export default function ClientFocus({
 
       {tab === 'meetings' && (
         <div className="cf-tab-body">
+          <CalendarMeetings space={space} data={data} />
           <PanelHeading
             title="Meetings"
             action={
@@ -2040,6 +2041,50 @@ function ClientLog({
           &ldquo;add to {space.name} log&rdquo;.
         </p>
       )}
+    </div>
+  );
+}
+
+// Calendar events linked to this client — matched by name from the
+// connected calendar, or linked manually through the boundary. Shown
+// upcoming first; nothing invented, only what the calendar holds.
+function CalendarMeetings({ space, data }: { space: Space; data: Workspace }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const events = (data.calendarEvents || [])
+    .filter((event) => event.spaceId === space.id && event.date >= today)
+    .sort((a, b) =>
+      a.date === b.date
+        ? a.time < b.time
+          ? -1
+          : 1
+        : a.date < b.date
+          ? -1
+          : 1,
+    );
+  if (!events.length) return null;
+  return (
+    <div className="cf-calendar-meetings">
+      <h3>From the calendar</h3>
+      <ul>
+        {events.map((event) => (
+          <li key={event.id}>
+            <span>
+              {event.date}
+              {event.time ? ' · ' + event.time : ''}
+            </span>
+            {event.googleUrl ? (
+              <a href={event.googleUrl} target="_blank" rel="noreferrer">
+                {event.title}
+              </a>
+            ) : (
+              <span>{event.title}</span>
+            )}
+            {event.spaceLink === 'auto' && (
+              <small className="muted">matched by name</small>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

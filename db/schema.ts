@@ -135,6 +135,8 @@ export const calendarEvents = sqliteTable(
     date: text('date').notNull(),
     time: text('time').notNull().default(''),
     description: text('description').notNull().default(''),
+    spaceId: text('spaceId').notNull().default(''),
+    spaceLink: text('spaceLink').notNull().default(''),
     revision: integer('revision').notNull().default(0),
     archived: integer('archived').notNull().default(0),
     actor: text('actor').notNull(),
