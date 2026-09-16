@@ -1790,3 +1790,10 @@
 .cf-contact-line a {
   color: inherit;
 }
+
+/* Today points at the one board */
+.today-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.4rem;
+}

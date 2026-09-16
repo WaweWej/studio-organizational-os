@@ -786,7 +786,6 @@ export default function Studio() {
                 openTask={openTask}
                 openBrief={setBriefSpaceId}
                 openPlan={openDailyPlan}
-                renderBoard={(tasks) => renderBoard(tasks, true)}
                 act={act}
                 busy={busy}
                 openBoard={() => openBoard()}

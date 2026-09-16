@@ -1,7 +1,7 @@
 'use client';
 import { taskSpaceId } from '@/lib/task-context';
 import FinishDay from './finish-day';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowRight,
   CalendarDays,
@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildDailyBrief, localDay, taskContext } from '@/lib/workspace-brief';
-import type { DailyPlan, Workspace, Task } from '@/lib/model';
+import type { DailyPlan, Workspace } from '@/lib/model';
 
 export function useWorkspaceClock() {
   const [now, setNow] = useState(() => new Date());
@@ -43,7 +43,7 @@ export default function Today({
   openBoard,
   openCalendar,
   openCalendarMeeting,
-  renderBoard,
+
   act,
 }: {
   data: Workspace;
@@ -57,7 +57,7 @@ export default function Today({
   openBoard: () => void;
   openCalendar: () => void;
   openCalendarMeeting: (id: string) => void;
-  renderBoard: (tasks: Task[]) => ReactNode;
+
   act: (command: Record<string, unknown>) => Promise<boolean>;
 }) {
   const [finishing, setFinishing] = useState(false);
@@ -234,17 +234,6 @@ export default function Today({
             </section>
           </div>
           <section className="today-board-section">
-            <header>
-              <div>
-                <h2>Your day</h2>
-                <p>
-                  Today’s plan, due tasks and unfinished work from earlier days.
-                </p>
-              </div>
-              <Button variant="ghost" onClick={openBoard}>
-                All my work <ArrowRight size={15} />
-              </Button>
-            </header>
             {!!brief.carryover.length && (
               <details className="today-carryover">
                 <summary>
@@ -263,7 +252,11 @@ export default function Today({
                 ))}
               </details>
             )}
-            {renderBoard(brief.todayTasks)}
+            <div className="today-footer">
+              <Button variant="ghost" onClick={openBoard}>
+                All my work <ArrowRight size={15} />
+              </Button>
+            </div>
           </section>
         </>
       )}

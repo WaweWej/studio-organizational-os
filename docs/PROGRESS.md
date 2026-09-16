@@ -548,3 +548,10 @@ under Brand & context beside the account lead, shown on the Overview as
 a contact line with mail and tel links, and read by the system from
 there: the contact email is what calendar matching decides by. Migration
 0026.
+
+## The board lives in one place · 16 September 2026
+
+The kanban is removed from Today by the owner's rule: one board, one
+place. Today keeps its identity — the committed plan as the spine,
+priorities, meetings, attention, and the carried-forward disclosure —
+and now points at Boards ("All my work") instead of duplicating it.
