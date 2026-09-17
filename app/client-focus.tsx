@@ -25,7 +25,6 @@ import {
   ArrowUpRight,
   CalendarDays,
   Check,
-  CheckCheck,
   ChevronRight,
   Circle,
   CircleCheck,
@@ -282,11 +281,6 @@ export default function ClientFocus({
   const meetings = data.meetings
     .filter((m) => m.spaceId === space.id)
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  const upcoming = meetings
-    .filter((m) => m.status === 'Planned')
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  const next = upcoming.find((m) => Date.parse(m.startsAt) >= now);
-  const previous = meetings.find((m) => m.status === 'Completed');
   const selectedMeeting = meetings.find((m) => m.id === meetingId);
   const deadlines = [...open]
     .sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'))
@@ -530,84 +524,43 @@ export default function ClientFocus({
             </div>
           </div>
           <div className="cf-main-grid">
-            <section className="cf-panel cf-meeting-focus">
+            <section className="cf-panel">
               <PanelHeading
-                icon={<CalendarDays size={17} />}
-                title={
-                  next && Date.parse(next.startsAt) < now
-                    ? 'Meeting to follow up'
-                    : 'Your next conversation'
-                }
+                icon={<Layers size={17} />}
+                title="Moving forward"
                 action={
                   <button
-                    className="cf-quiet-button"
-                    aria-label="Plan a meeting"
-                    onClick={() => setNewMeeting(true)}
+                    className="cf-text-button"
+                    onClick={() => setNewProject(true)}
                     disabled={!ready}
                   >
-                    <Plus size={17} />
+                    <Plus size={14} />
+                    Project
                   </button>
                 }
               />
-              {next ? (
-                <>
-                  <div className="cf-meeting-title">
-                    <div className="cf-calendar-tile">
-                      <span>
-                        {new Date(next.startsAt).toLocaleDateString('en', {
-                          month: 'short',
-                        })}
-                      </span>
-                      <strong>{new Date(next.startsAt).getDate()}</strong>
-                    </div>
-                    <div>
-                      <h3>{next.title}</h3>
-                      <p>{meetingDate(next.startsAt)}</p>
-                    </div>
-                  </div>
-                  <div className="cf-agenda">
-                    <span className="cf-section-label">ON THE AGENDA</span>
-                    {next.agenda ? (
-                      <ol>
-                        {lines(next.agenda)
-                          .slice(0, 3)
-                          .map((line, i) => (
-                            <li key={i}>
-                              <span>{String(i + 1).padStart(2, '0')}</span>
-                              {line}
-                            </li>
-                          ))}
-                      </ol>
-                    ) : (
-                      <p className="cf-muted">
-                        Set an agenda so everyone arrives with the same context.
-                      </p>
-                    )}
-                  </div>
-                  <div className="cf-meeting-footer">
-                    <span>Brief, decisions & follow-ups</span>
-                    <Button
-                      className="cf-primary"
-                      onClick={() => setMeetingId(next.id)}
-                    >
-                      Open meeting
-                      <ArrowRight size={15} />
-                    </Button>
-                  </div>
-                </>
+              {projects.length ? (
+                projects.slice(0, 2).map(projectCard)
               ) : (
                 <div className="cf-empty">
-                  <h3>Make room for the next conversation.</h3>
-                  <p>Set a date and collect the things you want to discuss.</p>
+                  <p>Give this client’s work a home.</p>
                   <Button
-                    className="cf-primary"
-                    onClick={() => setNewMeeting(true)}
+                    variant="outline"
+                    onClick={() => setNewProject(true)}
                     disabled={!ready}
                   >
-                    <Plus size={15} />
-                    Plan a meeting
+                    Create a project
                   </Button>
                 </div>
+              )}
+              {projects.length > 2 && (
+                <button
+                  className="cf-text-button cf-panel-end"
+                  onClick={() => setTab('work')}
+                >
+                  View all {projects.length} projects
+                  <ArrowRight size={15} />
+                </button>
               )}
             </section>
             <section className="cf-panel cf-deadlines">
@@ -665,102 +618,8 @@ export default function ClientFocus({
                 </div>
               )}
             </section>
-            <section className="cf-panel">
-              <PanelHeading
-                icon={<Layers size={17} />}
-                title="Moving forward"
-                action={
-                  <button
-                    className="cf-text-button"
-                    onClick={() => setNewProject(true)}
-                    disabled={!ready}
-                  >
-                    <Plus size={14} />
-                    Project
-                  </button>
-                }
-              />
-              {projects.length ? (
-                projects.slice(0, 2).map(projectCard)
-              ) : (
-                <div className="cf-empty">
-                  <p>Give this client’s work a home.</p>
-                  <Button
-                    variant="outline"
-                    onClick={() => setNewProject(true)}
-                    disabled={!ready}
-                  >
-                    Create a project
-                  </Button>
-                </div>
-              )}
-              {projects.length > 2 && (
-                <button
-                  className="cf-text-button cf-panel-end"
-                  onClick={() => setTab('work')}
-                >
-                  View all {projects.length} projects
-                  <ArrowRight size={15} />
-                </button>
-              )}
-            </section>
-            <section className="cf-panel cf-compass">
-              <PanelHeading
-                icon={<Target size={17} />}
-                title="Keep this in mind"
-                action={
-                  <button
-                    className="cf-quiet-button"
-                    onClick={() => setEditBrand(true)}
-                    disabled={!ready}
-                    aria-label="Edit client goals"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                }
-              />
-              <div>
-                <span className="cf-section-label">WHAT THEY WANT</span>
-                <p>
-                  {space.wants ||
-                    'Capture what success looks like for this client.'}
-                </p>
-              </div>
-              <div>
-                <span className="cf-section-label">WHAT THEY NEED FROM US</span>
-                <p>
-                  {space.needs ||
-                    'Keep the practical needs and non-negotiables close to the work.'}
-                </p>
-              </div>
-            </section>
           </div>
-          <section className="cf-last-meeting">
-            <span className="cf-last-icon">
-              <CheckCheck size={20} />
-            </span>
-            <div>
-              <span className="cf-section-label">
-                WHERE WE LEFT OFF
-                {previous ? ` · ${shortDate(previous.startsAt)}` : ''}
-              </span>
-              <p>
-                {previous?.decisions
-                  ? lines(previous.decisions)[0]
-                  : 'Decisions from completed meetings will stay here.'}
-              </p>
-            </div>
-            {previous && (
-              <button
-                className="cf-text-button"
-                onClick={() => setMeetingId(previous.id)}
-              >
-                Meeting notes
-                <ArrowUpRight size={15} />
-              </button>
-            )}
-          </section>
-        </>
+          </>
       )}
 
       {tab === 'overview' && (
@@ -936,7 +795,62 @@ export default function ClientFocus({
                 </a>
               )}
             </section>
-          </div>
+<section className="cf-panel cf-deadlines">
+              <PanelHeading
+                icon={<Flag size={17} />}
+                title="What needs to move"
+                action={
+                  <button
+                    className="cf-text-button"
+                    onClick={() => {
+                      setTab('work');
+                      setWorkFilter('Open');
+                    }}
+                  >
+                    All work
+                    <ArrowUpRight size={14} />
+                  </button>
+                }
+              />
+              {deadlines.length ? (
+                deadlines.map((task) => (
+                  <div className="cf-deadline-row" key={task.id}>
+                    <button
+                      className={`cf-deadline-date ${task.due && task.due < todayKey(now) ? 'is-overdue' : ''}`}
+                      onClick={() => editTaskDeadline(task)}
+                      disabled={!ready || busy}
+                      aria-label={`Set deadline for ${task.title}`}
+                    >
+                      <span>{task.due ? shortDate(task.due) : 'Set date'}</span>
+                      {task.due && task.due < todayKey(now) ? (
+                        <small>Overdue</small>
+                      ) : (
+                        <Pencil size={11} />
+                      )}
+                    </button>
+                    <button
+                      className="cf-deadline-task"
+                      onClick={() => openTask(task.id)}
+                    >
+                      <strong>{task.title}</strong>
+                      <span>
+                        <Stage task={task} />
+                        {data.members.find((m) => m.id === task.assignee)?.name}
+                      </span>
+                    </button>
+                    <ChevronRight size={14} />
+                  </div>
+                ))
+              ) : (
+                <div className="cf-empty">
+                  <CircleCheck size={24} />
+                  <p>
+                    No open tasks. Add the next piece of work when you’re ready.
+                  </p>
+                </div>
+              )}
+            </section>
+                      </div>
           <RelatedResources target={{ type: 'space', id: space.id }} />
         </div>
       )}

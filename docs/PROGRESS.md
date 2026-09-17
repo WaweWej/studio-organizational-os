@@ -555,3 +555,13 @@ The kanban is removed from Today by the owner's rule: one board, one
 place. Today keeps its identity — the committed plan as the spine,
 priorities, meetings, attention, and the carried-forward disclosure —
 and now points at Boards ("All my work") instead of duplicating it.
+
+## The overview earns its name · 16 September 2026
+
+The owner's rule applied to the client page: the Overview keeps only
+what answers "where does this client stand" — the contact line, the
+upcoming meeting, current projects, and tasks with deadlines. The
+internal-meeting panel, the wants/needs compass, and the last-meeting
+block were duplications of their own tabs (Meetings, Brand & context)
+and are removed rather than rehoused. Same rule as the Today board:
+every surface answers one question; depth lives in its tab.
