@@ -594,3 +594,12 @@ provenance notes and clearing their event stamps; anything the owner
 touched is preserved. The cleanup's conditions are proven against a
 replica of the wrong state, and the suite's dates are dynamic so it
 never rots.
+
+## The floor set at the 18th · 18 September 2026
+
+The owner fixed the cutoff: meetings before 2026-09-18 are history.
+Migration 0029 applies the same strict cleanup as 0028 at the new floor
+— untouched auto-created prospects from before the 18th removed with
+their provenance, event stamps cleared, anything the owner worked on
+preserved. The forward law is unchanged: only events dated today or
+later prospect.
