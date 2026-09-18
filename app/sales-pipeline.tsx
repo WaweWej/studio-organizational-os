@@ -67,7 +67,9 @@ export default function SalesPipeline({
   const [closed, setClosed] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
   const prospect = pipeline.find((p) => p.id === selected);
-  const stages = closed ? salesStages.slice(4) : salesStages;
+  // Closed stages are the last two; the slice is anchored from the end
+  // so inserting working stages never shifts it.
+  const stages = closed ? salesStages.slice(-2) : salesStages;
   const move = (p: Prospect, stage: SalesStage) =>
     void act({ type: 'sales-stage', id: p.id, revision: p.revision, stage });
   const example = 'Sales meeting with "", next step: ';
@@ -154,7 +156,7 @@ export default function SalesPipeline({
                 }}
               >
                 <h2>
-                  <span className={`sales-stage-dot ${stage.toLowerCase()}`} />
+                  <span className={`sales-stage-dot ${stage.toLowerCase().replace(/\s+/g, '-')}`} />
                   {stage}
                   <small>{people.length}</small>
                 </h2>

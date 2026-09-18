@@ -66,7 +66,7 @@
 }
 .sales-lanes {
   display: grid;
-  grid-template-columns: repeat(6, minmax(200px, 1fr));
+  grid-template-columns: repeat(7, minmax(200px, 1fr));
   overflow-x: auto;
   padding-bottom: 16px;
   gap: 20px;
@@ -100,6 +100,9 @@
 }
 .sales-stage-dot.discovery {
   background: #9baedb;
+}
+.sales-stage-dot.create-proposal {
+  background: #8a7bc4;
 }
 .sales-stage-dot.proposal {
   background: #b0a6cc;

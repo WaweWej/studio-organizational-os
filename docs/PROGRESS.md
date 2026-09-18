@@ -639,3 +639,11 @@ with no review request. The request dialog offers "In review externally
 workspaces without teammates is gone. Proven over HTTP (move, no review
 row, completion from external review, formal guards intact) and driven
 in the browser from drag to landing.
+
+## Create proposal enters the pipeline · 18 September 2026
+
+The owner's stage vocabulary: Create proposal (the proposal is being
+made) before Proposal (the proposal is sent). The closed-stages slice is
+now anchored from the end so inserting working stages never shifts it,
+stage dot classes are slugged so multi-word stages style correctly, and
+the lane grid takes seven columns.

@@ -2,6 +2,7 @@ import { parseCapture } from './task-capture';
 export const salesStages = [
   'New',
   'Discovery',
+  'Create proposal',
   'Proposal',
   'Negotiation',
   'Won',
