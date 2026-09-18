@@ -67,6 +67,10 @@ assert.equal(
 const { db } = testDatabase();
 const org = 'org-sales';
 const ctx = { db, org, actor: 'me', email: 'gabriel@wawe.dk' };
+const day = (offset) =>
+  new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+const future = day(2);
+const past = day(-2);
 const insertEvent = (id, title, description, attendees, extra = {}) =>
   db
     .prepare(
@@ -76,7 +80,7 @@ const insertEvent = (id, title, description, attendees, extra = {}) =>
       org,
       id,
       title,
-      extra.date || '2026-09-18',
+      extra.date || future,
       extra.time || '10:00',
       description,
       attendees,
@@ -108,6 +112,15 @@ await insertEvent(
   'https://cal.com/y',
   'gabriel@wawe.dk,bo@firma.dk',
   { prospectLink: 'ignored' },
+);
+// Meetings already held stay history: a past Cal.com meeting never
+// prospects.
+await insertEvent(
+  's0',
+  'Old salgsmøde between Gabriel Elung-Jensen and Per Gammel',
+  'https://cal.com/old',
+  'gabriel@wawe.dk,per@gammel.dk',
+  { date: past },
 );
 
 const readEvents = async () =>
@@ -143,6 +156,8 @@ const s1 = events.find((e) => e.id === 's1');
 assert.equal(s1.prospectLink, 'auto');
 assert.equal(s1.prospectId, prospects[0].id);
 assert.equal(events.find((e) => e.id === 's2').prospectLink, '');
+assert.equal(events.find((e) => e.id === 's0').prospectLink, '');
+assert.equal(prospects.some((p) => p.name === 'Per Gammel'), false);
 assert.equal(events.find((e) => e.id === 's3').prospectId, '');
 assert.equal(events.find((e) => e.id === 's4').prospectLink, 'ignored');
 const provenance = (
@@ -153,7 +168,7 @@ const provenance = (
 ).results;
 assert.equal(provenance.length, 1);
 assert.match(provenance[0].body, /Sales meeting from the calendar/);
-assert.match(provenance[0].body, /2026-09-18 10:00/);
+assert.match(provenance[0].body, new RegExp(future + ' 10:00'));
 
 // Idempotent: the second pass over fresh rows creates and stamps nothing.
 events = await readEvents();
@@ -168,7 +183,7 @@ await insertEvent(
   'Opfølgning between Gabriel Elung-Jensen and Jens Hansen',
   'https://cal.com/z',
   'gabriel@wawe.dk,jens@firma.dk',
-  { date: '2026-09-25' },
+  { date: day(9) },
 );
 events = await readEvents();
 prospects = await readProspects();
@@ -214,5 +229,5 @@ await assert.rejects(
 );
 
 console.log(
-  'PASS: calendar sales prospecting — Cal.com recognition, external attendee against the signed-in address, title name parsing, creation at New with timeline provenance, email matching to one prospect across meetings, idempotency, client-linked and ignored exclusions, and boundary corrections.',
+  'PASS: calendar sales prospecting — upcoming-only floor with past meetings excluded, Cal.com recognition, external attendee against the signed-in address, title name parsing, creation at New with timeline provenance, email matching to one prospect across meetings, idempotency, client-linked and ignored exclusions, and boundary corrections.',
 );

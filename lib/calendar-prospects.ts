@@ -1,6 +1,7 @@
 // Sales meetings booked through Cal.com become prospects. The law:
-// a synced calendar event carrying Cal.com's signature in its
-// description, linked to no client, yields the external attendee — every
+// a synced calendar event dated today or later, carrying Cal.com's
+// signature in its description, linked to no client, yields the external
+// attendee — every
 // attendee that is not the signed-in person — and that attendee is
 // matched to an existing prospect by contact email or created at stage
 // New, with a provenance note on the prospect's timeline. Idempotent:
@@ -97,6 +98,7 @@ export async function autoProspectCalendarEvents(
   events: EventRow[],
   prospects: ProspectRow[],
   limit = 20,
+  today = new Date().toISOString().slice(0, 10),
 ): Promise<number> {
   const own = (c.email || '').trim().toLowerCase();
   if (!own) return 0;
@@ -106,6 +108,8 @@ export async function autoProspectCalendarEvents(
   for (const event of events) {
     if (produced >= limit) break;
     if (event.archived || event.spaceId || event.prospectLink) continue;
+    // The funnel's New means upcoming: meetings already held stay history.
+    if (event.date < today) continue;
     if (!isCalcomEvent(event)) continue;
     const email = externalAttendee(event.attendees || '', own);
     if (!email) continue;

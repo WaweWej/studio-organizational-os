@@ -582,3 +582,15 @@ never processed twice, and calendar-link-prospect (46 commands) corrects
 or permanently ignores an event through the boundary. Read-time,
 in-memory patching, one bounded batch — the 1102 lesson applied from
 birth.
+
+## The funnel's New means upcoming · 16 September 2026
+
+The prospecting law gains its date floor: only events dated today or
+later prospect; meetings already held stay history. Migration 0028
+cleans what the unfloored law created, strictly — automatically created
+prospects still at New, never converted, carrying nothing but calendar
+provenance, linked only to past events — removing them with their
+provenance notes and clearing their event stamps; anything the owner
+touched is preserved. The cleanup's conditions are proven against a
+replica of the wrong state, and the suite's dates are dynamic so it
+never rots.
