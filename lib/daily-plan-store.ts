@@ -114,6 +114,7 @@ export async function commitDailyPlan(
           nameKey,
           owner: c.actor,
           stage: 'New' as const,
+          contactEmail: '',
           revision: 0,
           createdAt: now,
           updatedAt: now,

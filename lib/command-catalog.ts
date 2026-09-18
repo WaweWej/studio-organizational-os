@@ -346,6 +346,14 @@ export const commandCatalog: CommandDescriptor[] = [
     fields: [id('id'), text('spaceId', false)],
   },
   {
+    name: 'calendar-link-prospect',
+    group: 'calendar',
+    summary:
+      'Link a calendar event to a prospect, or pass an empty prospectId to keep it out of automatic sales prospecting.',
+    risk: 'write',
+    fields: [id('id'), text('prospectId', false)],
+  },
+  {
     name: 'member-invite',
     group: 'access',
     summary:

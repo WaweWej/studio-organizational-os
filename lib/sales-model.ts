@@ -20,6 +20,7 @@ export type Prospect = {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  contactEmail: string;
 };
 export type ProspectEvent = {
   id: string;

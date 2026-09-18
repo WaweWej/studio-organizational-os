@@ -1,3 +1,4 @@
+import { autoProspectCalendarEvents } from './calendar-prospects';
 import { autoLinkCalendarEvents } from './calendar-space-link';
 import { resolveMembership } from './workspace-members';
 import { changeDayWork } from './day-work-store';
@@ -158,11 +159,12 @@ export async function context(): Promise<Context> {
     },
   ).catch(() => null);
   const c = membership
-    ? { ...membership, db: env.DB }
+    ? { ...membership, email: user.email || '', db: env.DB }
     : {
         org: user.userId,
         actor: 'me',
         name: user.fullName || user.displayName.split('@')[0],
+        email: user.email || '',
         db: env.DB,
       };
   await seed(c);
@@ -277,6 +279,11 @@ export async function readWorkspace(c: Context): Promise<Workspace> {
     (out.calendarEvents as { id: string; title: string; attendees?: string; spaceId: string; spaceLink: string }[]) || [],
     (out.spaces as { id: string; name: string; contactEmail?: string }[]) || [],
   ).catch(() => 0);
+  await autoProspectCalendarEvents(
+    c as Parameters<typeof autoProspectCalendarEvents>[0],
+    (out.calendarEvents as Parameters<typeof autoProspectCalendarEvents>[1]) || [],
+    (out.prospects as Parameters<typeof autoProspectCalendarEvents>[2]) || [],
+  ).catch(() => 0);
   out.calendarEvents = (
     out.calendarEvents as NonNullable<Workspace['calendarEvents']>
   ).filter((e) => (!e.archived || e.googleEventId) && (!e.googleEventId || e.actor === c.actor));
@@ -346,6 +353,11 @@ export async function mutate(
   if (type === 'calendar-link-space') {
     const { linkCalendarSpace } = await import('./calendar-space-link');
     await linkCalendarSpace(c, input);
+    return;
+  }
+  if (type === 'calendar-link-prospect') {
+    const { linkCalendarProspect } = await import('./calendar-prospects');
+    await linkCalendarProspect(c, input);
     return;
   }
   if (type === 'member-invite' || type === 'member-revoke') {

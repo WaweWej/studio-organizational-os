@@ -565,3 +565,20 @@ internal-meeting panel, the wants/needs compass, and the last-meeting
 block were duplications of their own tabs (Meetings, Brand & context)
 and are removed rather than rehoused. Same rule as the Today board:
 every surface answers one question; depth lives in its tab.
+
+## Cal.com meetings walk into the funnel · 16 September 2026
+
+Sales meetings booked through Cal.com become prospects on their own. The
+law: a synced event carrying Cal.com's signature in its description,
+linked to no client and not marked ignored, yields the external attendee
+— every address that is not the signed-in person's — who is matched to
+an existing prospect by contact email (prospects now carry one,
+migration 0027) or created at stage New. The prospect's name is parsed
+from Cal.com's title shapes ("… between A and B", "… with B"), the
+guest side decided by unique overlap with the email's local part,
+falling back to the email itself. Every processed meeting leaves a
+provenance note on the prospect's timeline, events are stamped and
+never processed twice, and calendar-link-prospect (46 commands) corrects
+or permanently ignores an event through the boundary. Read-time,
+in-memory patching, one bounded batch — the 1102 lesson applied from
+birth.

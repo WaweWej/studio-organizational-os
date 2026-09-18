@@ -213,6 +213,8 @@ export type CalendarEvent = {
   spaceId: string;
   spaceLink: string;
   attendees: string;
+  prospectId: string;
+  prospectLink: string;
 };
 export function emptyWorkspace(name = 'You'): Workspace {
   return {
