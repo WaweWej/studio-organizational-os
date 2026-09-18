@@ -626,3 +626,16 @@ shared drag auto-scroll hook on both boards scrolls the window when a
 drag nears the top or bottom edge, speed growing toward the edge,
 inert for foreign drags. Stretch and live drop targeting verified in
 the browser.
+
+## Review without a reviewer · 18 September 2026
+
+Review is a state of the work, not a ceremony requiring colleagues —
+sometimes the work sits in review at the client. The law revised: an
+explicitly chosen reviewer runs the formal flow with all its guards;
+otherwise the task's standing reviewer decides, and empty or yourself
+means none — the move to Review is then a plain, honest stage change
+with no review request. The request dialog offers "In review externally
+— no reviewer" alongside the reviewer form, and the dead end for
+workspaces without teammates is gone. Proven over HTTP (move, no review
+row, completion from external review, formal guards intact) and driven
+in the browser from drag to landing.

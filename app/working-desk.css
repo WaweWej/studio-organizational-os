@@ -1826,3 +1826,15 @@
   background: rgba(0, 0, 0, 0.06);
   color: #b02a2a;
 }
+
+/* External review path in the request dialog */
+.review-external {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 0.9rem;
+  margin-top: 0.4rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.review-external p {
+  margin: 0;
+}

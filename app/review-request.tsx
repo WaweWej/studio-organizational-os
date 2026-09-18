@@ -36,7 +36,16 @@ export default function ReviewRequest({ task, data, busy, error, act, close }: {
         <p className="muted">They’ll receive an in-app review request. You can still mark this task Done at any time.</p>
         {failed && <p role="alert">{error || 'The review request was not saved. Please try again.'}</p>}
         <Button type="submit" disabled={busy || !reviewer}>Request review</Button>
-      </form> : <p>No other team members are available yet. Team access is not set up for this workspace.</p>}
+      </form> : null}
+      <div className="review-external">
+        <Button variant="outline" disabled={busy} onClick={async () => {
+          setFailed(false);
+          if (await act({ type: 'move', id: task.id, revision: task.revision, stage: 'Review' })) close();
+          else setFailed(true);
+        }}>In review externally — no reviewer</Button>
+        <p className="muted">For work sitting with the client or another outside party. No review request is sent.</p>
+      </div>
+      {!reviewers.length && failed && <p role="alert">{error || 'The move was not saved. Please try again.'}</p>}
       <Button variant="outline" disabled={busy} onClick={close}>Cancel</Button>
     </DialogContent>
   </Dialog>;

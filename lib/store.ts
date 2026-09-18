@@ -901,7 +901,19 @@ export async function mutate(
     const stage = stageValue(input.stage);
     if (stage === task.stage && !capture) return;
     if (stage === task.stage) activity = 'Confirmed status: ' + stage;
-    else if (stage === 'Review') await submit();
+    else if (stage === 'Review') {
+      // An explicitly chosen reviewer runs the formal flow, whose own
+      // guards speak. Otherwise the task's standing reviewer decides —
+      // and empty or yourself means none, since self-review is refused:
+      // the work is in review externally, at the client or elsewhere.
+      const standing = textValue(task.reviewer ?? '', 'Reviewer', 100);
+      if (input.reviewer !== undefined || (standing && standing !== c.actor))
+        await submit();
+      else {
+        updates.stage = 'Review';
+        activity = `Moved from ${task.stage} to Review`;
+      }
+    }
     else if (stage === 'Done') complete();
     else {
       updates.stage = stage;
