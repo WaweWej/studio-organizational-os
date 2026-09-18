@@ -615,3 +615,14 @@ it; and its source calendar events are marked ignored so the automation
 never resurrects the deleted ticket. Deletion, detachment, and
 no-resurrection are proven in the suite; the control was driven in the
 browser against a live card.
+
+## Drop surfaces that reach as far as you scroll · 18 September 2026
+
+The owner, scrolled deep in a tall board column, could not reach the
+neighbouring lanes to drop. Two fixes: lanes stretch to the tallest
+column (align-items: stretch) so every stage offers a full-height drop
+surface at any scroll depth — the sales board already stretched — and a
+shared drag auto-scroll hook on both boards scrolls the window when a
+drag nears the top or bottom edge, speed growing toward the edge,
+inert for foreign drags. Stretch and live drop targeting verified in
+the browser.

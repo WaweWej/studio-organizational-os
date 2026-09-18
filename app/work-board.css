@@ -304,7 +304,9 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(225px, 1fr));
   gap: 17px;
-  align-items: start;
+  /* Lanes stretch to the tallest column so every stage offers a
+     full-height drop surface however deep the board is scrolled. */
+  align-items: stretch;
   overflow-x: auto;
   padding: 0 1px 20px;
   scroll-snap-type: x proximity;

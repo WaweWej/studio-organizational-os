@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- Native drag/drop has an equivalent keyboard-accessible Move menu on every card. */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useDragAutoScroll } from './drag-auto-scroll';
 import {
   Plus,
   CornerDownLeft,
@@ -85,6 +86,8 @@ export default function WorkBoard({
   enabled: boolean;
   drafts: Map<string, CaptureDraft>;
 }) {
+  useDragAutoScroll('application/x-studio-task');
+
   const [waiting, setWaiting] = useState<Task | null>(null);
   const [reviewTask, setReviewTask] = useState<Task | null>(null);
   const [waitingText, setWaitingText] = useState('');

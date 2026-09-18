@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- Native drag/drop has the equivalent keyboard-accessible Sales stage select in each prospect workspace. */
 import ProspectClientForm from './prospect-client-form';
+import { useDragAutoScroll } from './drag-auto-scroll';
 import { useState } from 'react';
 import { X,
   ArrowUpRight,
@@ -56,6 +57,8 @@ export default function SalesPipeline({
   openMeeting: (id: string) => void;
   planMeeting: (prospectId?: string) => void;
 }) {
+  useDragAutoScroll('application/x-studio-prospect');
+
   const [created, setCreated] = useState<string | null>(null);
   const createdClient = data.prospects.find((p) => p.id === created)?.clientId;
   const [converting, setConverting] = useState<string | null>(null);
