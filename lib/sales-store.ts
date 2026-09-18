@@ -1,4 +1,5 @@
 import { convertProspect } from './sales-conversion-store';
+import { deleteProspect } from './prospect-delete';
 import { changeSalesStage } from './sales-stage-store';
 import { captureInsert } from './entry-store';
 import type { Context } from './store';
@@ -143,6 +144,10 @@ export async function mutateSales(c: Context, input: Record<string, unknown>) {
   }
   if (input.type === 'sales-stage') {
     await changeSalesStage(c, input);
+    return;
+  }
+  if (input.type === 'sales-delete') {
+    await deleteProspect(c, input);
     return;
   }
   throw new AppError('Unknown sales action.');

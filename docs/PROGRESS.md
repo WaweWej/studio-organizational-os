@@ -603,3 +603,15 @@ Migration 0029 applies the same strict cleanup as 0028 at the new floor
 their provenance, event stamps cleared, anything the owner worked on
 preserved. The forward law is unchanged: only events dated today or
 later prospect.
+
+## Delete on the sales board · 18 September 2026
+
+Prospects can be deleted from the pipeline: a hover-revealed control on
+every card, confirmed before acting, through the new sales-delete
+command (47 in the catalog, destructive). The law of a deletion:
+converted prospects are refused — they are a client's history; linked
+tasks are detached, never destroyed; the prospect's timeline goes with
+it; and its source calendar events are marked ignored so the automation
+never resurrects the deleted ticket. Deletion, detachment, and
+no-resurrection are proven in the suite; the control was driven in the
+browser against a live card.

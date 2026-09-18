@@ -346,6 +346,14 @@ export const commandCatalog: CommandDescriptor[] = [
     fields: [id('id'), text('spaceId', false)],
   },
   {
+    name: 'sales-delete',
+    group: 'sales',
+    summary:
+      'Delete a prospect from the pipeline. Converted prospects are refused; linked tasks are detached; source calendar events are marked ignored so the ticket never returns.',
+    risk: 'destructive',
+    fields: [id('id')],
+  },
+  {
     name: 'calendar-link-prospect',
     group: 'calendar',
     summary:

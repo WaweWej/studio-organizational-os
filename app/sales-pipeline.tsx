@@ -2,7 +2,7 @@
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions -- Native drag/drop has the equivalent keyboard-accessible Sales stage select in each prospect workspace. */
 import ProspectClientForm from './prospect-client-form';
 import { useState } from 'react';
-import {
+import { X,
   ArrowUpRight,
   Plus,
   ArrowRight,
@@ -175,6 +175,25 @@ export default function SalesPipeline({
                       }}
                       onDragEnd={() => setDragging(null)}
                     >
+                      {!p.clientId && (
+                        <button
+                          className="prospect-delete"
+                          aria-label={'Delete ' + p.name}
+                          disabled={busy}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                'Delete ' +
+                                  p.name +
+                                  ' from the pipeline? Linked tasks are kept; its calendar meetings will not recreate it.',
+                              )
+                            )
+                              void act({ type: 'sales-delete', id: p.id });
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
                       <button onClick={() => select(p.id)}>
                         <span className="prospect-card-top">
                           <i>{p.name.slice(0, 1)}</i>

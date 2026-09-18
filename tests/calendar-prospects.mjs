@@ -228,6 +228,59 @@ await assert.rejects(
   /not found/,
 );
 
+// The delete power: through the boundary, the ticket goes, its timeline
+// goes, tasks detach, and the source meetings are marked ignored so the
+// automation never resurrects it.
+{
+  const { deleteProspect } = await import('../lib/prospect-delete.ts');
+  const target = (await readProspects())[0];
+  await db
+    .prepare(
+      "INSERT INTO tasks (org,id,title,stage,assignee,reviewer,description,due,priority,blocked,deliverable,delivery,version,position,revision,archived,updatedAt,lastMutation,prospectId) VALUES (?,?,?,'Up next','me','','','','',0,'','',0,0,0,0,'t','n',?)",
+    )
+    .bind(org, 'task-p', 'Follow up', target.id)
+    .run();
+  await deleteProspect({ db, org }, { id: target.id });
+  assert.equal(
+    (await readProspects()).some((p) => p.id === target.id),
+    false,
+  );
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT COUNT(*) n FROM prospectEvents WHERE org=? AND prospectId=?')
+        .bind(org, target.id)
+        .first()
+    ).n,
+    0,
+  );
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT prospectId FROM tasks WHERE org=? AND id=?')
+        .bind(org, 'task-p')
+        .first()
+    ).prospectId,
+    null,
+  );
+  const sources = (
+    await db
+      .prepare('SELECT id,prospectLink FROM calendarEvents WHERE org=? AND prospectLink=?')
+      .bind(org, 'auto')
+      .all()
+  ).results;
+  assert.equal(sources.length, 0);
+  // And the automation finds nothing to resurrect.
+  assert.equal(
+    await autoProspectCalendarEvents(ctx, await readEvents(), await readProspects()),
+    0,
+  );
+  await assert.rejects(
+    deleteProspect({ db, org }, { id: target.id }),
+    /not found/,
+  );
+}
+
 console.log(
-  'PASS: calendar sales prospecting — upcoming-only floor with past meetings excluded, Cal.com recognition, external attendee against the signed-in address, title name parsing, creation at New with timeline provenance, email matching to one prospect across meetings, idempotency, client-linked and ignored exclusions, and boundary corrections.',
+  'PASS: calendar sales prospecting — upcoming-only floor with past meetings excluded, Cal.com recognition, external attendee against the signed-in address, title name parsing, creation at New with timeline provenance, email matching to one prospect across meetings, idempotency, client-linked and ignored exclusions, boundary corrections, and deletion that detaches tasks, clears the timeline, and ignores source meetings against resurrection.',
 );
